@@ -1,0 +1,7 @@
+{
+  "name": "Memori-City",
+  "description": "Local-first agentic memory kernel with 3D city visualization. Designed for Hermes Agent and Obsidian integration.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

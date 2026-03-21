@@ -1,0 +1,627 @@
+Saved at path
+  Relative: honcho.md
+  Absolute: /app/applet/honcho.md
+:"BreadcrumbList","itemListElement":\[{"@type":"ListItem","position":1,"name":"Honcho Memory","item":"https://hermes-agent.nousresearch.com/docs/user-guide/features/honcho"}\]} !function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")),document.documentElement.setAttribute("data-theme-choice",t||"system")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var\[t,e\]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()
+
+[Skip to main content](#__docusaurus_skipToContent_fallback)
+
+[
+
+![Hermes Agent](/docs/img/logo.png)![Hermes Agent](/docs/img/logo.png)
+
+**Hermes Agent**](/docs/)[Docs](/docs/getting-started/quickstart)
+
+[Home](https://hermes-agent.nousresearch.com)[GitHub](https://github.com/NousResearch/hermes-agent)[Discord](https://discord.gg/NousResearch)
+
+*   [Getting Started](/docs/getting-started/quickstart)
+    
+    *   [Quickstart](/docs/getting-started/quickstart)
+    *   [Installation](/docs/getting-started/installation)
+    *   [Updating & Uninstalling](/docs/getting-started/updating)
+    *   [Learning Path](/docs/getting-started/learning-path)
+*   [Guides & Tutorials](/docs/guides/tips)
+    
+    *   [Tips & Best Practices](/docs/guides/tips)
+    *   [Tutorial: Daily Briefing Bot](/docs/guides/daily-briefing-bot)
+    *   [Tutorial: Team Telegram Assistant](/docs/guides/team-telegram-assistant)
+    *   [Using Hermes as a Python Library](/docs/guides/python-library)
+    *   [Use MCP with Hermes](/docs/guides/use-mcp-with-hermes)
+    *   [Use SOUL.md with Hermes](/docs/guides/use-soul-with-hermes)
+    *   [Use Voice Mode with Hermes](/docs/guides/use-voice-mode-with-hermes)
+*   [User Guide](/docs/user-guide/cli)
+    
+    *   [CLI Interface](/docs/user-guide/cli)
+    *   [Configuration](/docs/user-guide/configuration)
+    *   [Sessions](/docs/user-guide/sessions)
+    *   [Security](/docs/user-guide/security)
+    *   [Messaging Gateway](/docs/user-guide/messaging/)
+        
+    *   [Core Features](/docs/user-guide/features/tools)
+        
+    *   [Automation](/docs/user-guide/features/cron)
+        
+    *   [Web & Media](/docs/user-guide/features/voice-mode)
+        
+    *   [Integrations](/docs/user-guide/features/api-server)
+        
+        *   [API Server](/docs/user-guide/features/api-server)
+        *   [ACP Editor Integration](/docs/user-guide/features/acp)
+        *   [MCP (Model Context Protocol)](/docs/user-guide/features/mcp)
+        *   [Honcho Memory](/docs/user-guide/features/honcho)
+        *   [Provider Routing](/docs/user-guide/features/provider-routing)
+        *   [Fallback Providers](/docs/user-guide/features/fallback-providers)
+    *   [Advanced](/docs/user-guide/features/batch-processing)
+        
+*   [Developer Guide](/docs/developer-guide/architecture)
+    
+*   [Reference](/docs/reference/cli-commands)
+    
+
+*   [](/docs/)
+*   User Guide
+*   Integrations
+*   Honcho Memory
+
+On this page
+
+Honcho Memory
+=============
+
+[Honcho](https://honcho.dev) is an AI-native memory system that gives Hermes persistent, cross-session understanding of users. While Hermes has built-in memory (`MEMORY.md` and `USER.md`), Honcho adds a deeper layer of **user modeling** — learning preferences, goals, communication style, and context across conversations via a dual-peer architecture where both the user and the AI build representations over time.
+
+Works Alongside Built-in Memory[​](#works-alongside-built-in-memory "Direct link to Works Alongside Built-in Memory")
+---------------------------------------------------------------------------------------------------------------------
+
+Hermes has two memory systems that can work together or be configured separately. In `hybrid` mode (the default), both run side by side — Honcho adds cross-session user modeling while local files handle agent-level notes.
+
+Feature
+
+Built-in Memory
+
+Honcho Memory
+
+Storage
+
+Local files (`~/.hermes/memories/`)
+
+Cloud-hosted Honcho API
+
+Scope
+
+Agent-level notes and user profile
+
+Deep user modeling via dialectic reasoning
+
+Persistence
+
+Across sessions on same machine
+
+Across sessions, machines, and platforms
+
+Query
+
+Injected into system prompt automatically
+
+Prefetched + on-demand via tools
+
+Content
+
+Manually curated by the agent
+
+Automatically learned from conversations
+
+Write surface
+
+`memory` tool (add/replace/remove)
+
+`honcho_conclude` tool (persist facts)
+
+Set `memoryMode` to `honcho` to use Honcho exclusively. See [Memory Modes](#memory-modes) for per-peer configuration.
+
+Setup[​](#setup "Direct link to Setup")
+---------------------------------------
+
+### Interactive Setup[​](#interactive-setup "Direct link to Interactive Setup")
+
+    hermes honcho setup
+
+The setup wizard walks through API key, peer names, workspace, memory mode, write frequency, recall mode, and session strategy. It offers to install `honcho-ai` if missing.
+
+### Manual Setup[​](#manual-setup "Direct link to Manual Setup")
+
+#### 1\. Install the Client Library[​](#1-install-the-client-library "Direct link to 1. Install the Client Library")
+
+    pip install 'honcho-ai>=2.0.1'
+
+#### 2\. Get an API Key[​](#2-get-an-api-key "Direct link to 2. Get an API Key")
+
+Go to [app.honcho.dev](https://app.honcho.dev) > Settings > API Keys.
+
+#### 3\. Configure[​](#3-configure "Direct link to 3. Configure")
+
+Honcho reads from `~/.honcho/config.json` (shared across all Honcho-enabled applications):
+
+    {  "apiKey": "your-honcho-api-key",  "hosts": {    "hermes": {      "workspace": "hermes",      "peerName": "your-name",      "aiPeer": "hermes",      "memoryMode": "hybrid",      "writeFrequency": "async",      "recallMode": "hybrid",      "sessionStrategy": "per-session",      "enabled": true    }  }}
+
+`apiKey` lives at the root because it is a shared credential across all Honcho-enabled tools. All other settings are scoped under `hosts.hermes`. The `hermes honcho setup` wizard writes this structure automatically.
+
+Or set the API key as an environment variable:
+
+    hermes config set HONCHO_API_KEY your-key
+
+info
+
+When an API key is present (either in `~/.honcho/config.json` or as `HONCHO_API_KEY`), Honcho auto-enables unless explicitly set to `"enabled": false`.
+
+Configuration[​](#configuration "Direct link to Configuration")
+---------------------------------------------------------------
+
+### Global Config (`~/.honcho/config.json`)[​](#global-config-honchoconfigjson "Direct link to global-config-honchoconfigjson")
+
+Settings are scoped to `hosts.hermes` and fall back to root-level globals when the host field is absent. Root-level keys are managed by the user or the honcho CLI -- Hermes only writes to its own host block (except `apiKey`, which is a shared credential at root).
+
+**Root-level (shared)**
+
+Field
+
+Default
+
+Description
+
+`apiKey`
+
+—
+
+Honcho API key (required, shared across all hosts)
+
+`sessions`
+
+`{}`
+
+Manual session name overrides per directory (shared)
+
+**Host-level (`hosts.hermes`)**
+
+Field
+
+Default
+
+Description
+
+`workspace`
+
+`"hermes"`
+
+Workspace identifier
+
+`peerName`
+
+_(derived)_
+
+Your identity name for user modeling
+
+`aiPeer`
+
+`"hermes"`
+
+AI assistant identity name
+
+`environment`
+
+`"production"`
+
+Honcho environment
+
+`enabled`
+
+_(auto)_
+
+Auto-enables when API key is present
+
+`saveMessages`
+
+`true`
+
+Whether to sync messages to Honcho
+
+`memoryMode`
+
+`"hybrid"`
+
+Memory mode: `hybrid` or `honcho`
+
+`writeFrequency`
+
+`"async"`
+
+When to write: `async`, `turn`, `session`, or integer N
+
+`recallMode`
+
+`"hybrid"`
+
+Retrieval strategy: `hybrid`, `context`, or `tools`
+
+`sessionStrategy`
+
+`"per-session"`
+
+How sessions are scoped
+
+`sessionPeerPrefix`
+
+`false`
+
+Prefix session names with peer name
+
+`contextTokens`
+
+_(Honcho default)_
+
+Max tokens for auto-injected context
+
+`dialecticReasoningLevel`
+
+`"low"`
+
+Floor for dialectic reasoning: `minimal` / `low` / `medium` / `high` / `max`
+
+`dialecticMaxChars`
+
+`600`
+
+Char cap on dialectic results injected into system prompt
+
+`linkedHosts`
+
+`[]`
+
+Other host keys whose workspaces to cross-reference
+
+All host-level fields fall back to the equivalent root-level key if not set under `hosts.hermes`. Existing configs with settings at root level continue to work.
+
+### Memory Modes[​](#memory-modes "Direct link to Memory Modes")
+
+Mode
+
+Effect
+
+`hybrid`
+
+Write to both Honcho and local files (default)
+
+`honcho`
+
+Honcho only — skip local file writes
+
+Memory mode can be set globally or per-peer (user, agent1, agent2, etc):
+
+    {  "memoryMode": {    "default": "hybrid",    "hermes": "honcho"  }}
+
+To disable Honcho entirely, set `enabled: false` or remove the API key.
+
+### Recall Modes[​](#recall-modes "Direct link to Recall Modes")
+
+Controls how Honcho context reaches the agent:
+
+Mode
+
+Behavior
+
+`hybrid`
+
+Auto-injected context + Honcho tools available (default)
+
+`context`
+
+Auto-injected context only — Honcho tools hidden
+
+`tools`
+
+Honcho tools only — no auto-injected context
+
+### Write Frequency[​](#write-frequency "Direct link to Write Frequency")
+
+Setting
+
+Behavior
+
+`async`
+
+Background thread writes (zero blocking, default)
+
+`turn`
+
+Synchronous write after each turn
+
+`session`
+
+Batched write at session end
+
+_integer N_
+
+Write every N turns
+
+### Session Strategies[​](#session-strategies "Direct link to Session Strategies")
+
+Strategy
+
+Session key
+
+Use case
+
+`per-session`
+
+Unique per run
+
+Default. Fresh session every time.
+
+`per-directory`
+
+CWD basename
+
+Each project gets its own session.
+
+`per-repo`
+
+Git repo root name
+
+Groups subdirectories under one session.
+
+`global`
+
+Fixed `"global"`
+
+Single cross-project session.
+
+Resolution order: manual map > session title > strategy-derived key > platform key.
+
+### Multi-host Configuration[​](#multi-host-configuration "Direct link to Multi-host Configuration")
+
+Multiple Honcho-enabled tools share `~/.honcho/config.json`. Each tool writes only to its own host block, reads its host block first, and falls back to root-level globals:
+
+    {  "apiKey": "your-key",  "peerName": "eri",  "hosts": {    "hermes": {      "workspace": "my-workspace",      "aiPeer": "hermes-assistant",      "memoryMode": "honcho",      "linkedHosts": ["claude-code"],      "contextTokens": 2000,      "dialecticReasoningLevel": "medium"    },    "claude-code": {      "workspace": "my-workspace",      "aiPeer": "clawd"    }  }}
+
+Resolution: `hosts.<tool>` field > root-level field > default. In this example, both tools share the root `apiKey` and `peerName`, but each has its own `aiPeer` and workspace settings.
+
+### Hermes Config (`~/.hermes/config.yaml`)[​](#hermes-config-hermesconfigyaml "Direct link to hermes-config-hermesconfigyaml")
+
+Intentionally minimal — most configuration comes from `~/.honcho/config.json`:
+
+    honcho: {}
+
+How It Works[​](#how-it-works "Direct link to How It Works")
+------------------------------------------------------------
+
+### Async Context Pipeline[​](#async-context-pipeline "Direct link to Async Context Pipeline")
+
+Honcho context is fetched asynchronously to avoid blocking the response path:
+
+Turn 1 is a cold start (no cache). All subsequent turns consume cached results with zero HTTP latency on the response path. The system prompt on turn 1 uses only static context to preserve prefix cache hits at the LLM provider.
+
+### Dual-Peer Architecture[​](#dual-peer-architecture "Direct link to Dual-Peer Architecture")
+
+Both the user and AI have peer representations in Honcho:
+
+*   **User peer** — observed from user messages. Honcho learns preferences, goals, communication style.
+*   **AI peer** — observed from assistant messages (`observe_me=True`). Honcho builds a representation of the agent's knowledge and behavior.
+
+Both representations are injected into the system prompt when available.
+
+### Dynamic Reasoning Level[​](#dynamic-reasoning-level "Direct link to Dynamic Reasoning Level")
+
+Dialectic queries scale reasoning effort with message complexity:
+
+Message length
+
+Reasoning level
+
+< 120 chars
+
+Config default (typically `low`)
+
+120-400 chars
+
+One level above default (cap: `high`)
+
+\> 400 chars
+
+Two levels above default (cap: `high`)
+
+`max` is never selected automatically.
+
+### Gateway Integration[​](#gateway-integration "Direct link to Gateway Integration")
+
+The gateway creates short-lived `AIAgent` instances per request. Honcho managers are owned at the gateway session layer (`_honcho_managers` dict) so they persist across requests within the same session and flush at real session boundaries (reset, resume, expiry, server stop).
+
+#### Session Isolation[​](#session-isolation "Direct link to Session Isolation")
+
+Each gateway session (e.g., a Telegram chat, a Discord channel) gets its own Honcho session context. The session key — derived from the platform and chat ID — is threaded through the entire tool dispatch chain so that Honcho tool calls always execute against the correct session, even when multiple users are messaging concurrently.
+
+This means:
+
+*   **`honcho_profile`**, **`honcho_search`**, **`honcho_context`**, and **`honcho_conclude`** all resolve the correct session at call time, not at startup
+*   Background memory flushes (triggered by `/reset`, `/resume`, or session expiry) preserve the original session key so they write to the correct Honcho session
+*   Synthetic flush turns (where the agent saves memories before context is lost) skip Honcho sync to avoid polluting conversation history with internal bookkeeping
+
+#### Session Lifecycle[​](#session-lifecycle "Direct link to Session Lifecycle")
+
+Event
+
+What happens to Honcho
+
+New message arrives
+
+Agent inherits the gateway's Honcho manager + session key
+
+`/reset`
+
+Memory flush fires with the old session key, then Honcho manager shuts down
+
+`/resume`
+
+Current session is flushed, then the resumed session's Honcho context loads
+
+Session expiry
+
+Automatic flush + shutdown after the configured idle timeout
+
+Gateway stop
+
+All active Honcho managers are flushed and shut down gracefully
+
+Tools[​](#tools "Direct link to Tools")
+---------------------------------------
+
+When Honcho is active, four tools become available. Availability is gated dynamically — they are invisible when Honcho is disabled.
+
+### `honcho_profile`[​](#honcho_profile "Direct link to honcho_profile")
+
+Fast peer card retrieval (no LLM). Returns a curated list of key facts about the user.
+
+### `honcho_search`[​](#honcho_search "Direct link to honcho_search")
+
+Semantic search over memory (no LLM). Returns raw excerpts ranked by relevance. Cheaper and faster than `honcho_context` — good for factual lookups.
+
+Parameters:
+
+*   `query` (string) — search query
+*   `max_tokens` (integer, optional) — result token budget
+
+### `honcho_context`[​](#honcho_context "Direct link to honcho_context")
+
+Dialectic Q&A powered by Honcho's LLM. Synthesizes an answer from accumulated conversation history.
+
+Parameters:
+
+*   `query` (string) — natural language question
+*   `peer` (string, optional) — `"user"` (default) or `"ai"`. Querying `"ai"` asks about the assistant's own history and identity.
+
+Example queries the agent might make:
+
+    "What are this user's main goals?""What communication style does this user prefer?""What topics has this user discussed recently?""What is this user's technical expertise level?"
+
+### `honcho_conclude`[​](#honcho_conclude "Direct link to honcho_conclude")
+
+Writes a fact to Honcho memory. Use when the user explicitly states a preference, correction, or project context worth remembering. Feeds into the user's peer card and representation.
+
+Parameters:
+
+*   `conclusion` (string) — the fact to persist
+
+CLI Commands[​](#cli-commands "Direct link to CLI Commands")
+------------------------------------------------------------
+
+    hermes honcho setup                        # Interactive setup wizardhermes honcho status                       # Show config and connection statushermes honcho sessions                     # List directory → session name mappingshermes honcho map <name>                   # Map current directory to a session namehermes honcho peer                         # Show peer names and dialectic settingshermes honcho peer --user NAME             # Set user peer namehermes honcho peer --ai NAME               # Set AI peer namehermes honcho peer --reasoning LEVEL       # Set dialectic reasoning levelhermes honcho mode                         # Show current memory modehermes honcho mode [hybrid|honcho|local]   # Set memory modehermes honcho tokens                       # Show token budget settingshermes honcho tokens --context N           # Set context token caphermes honcho tokens --dialectic N         # Set dialectic char caphermes honcho identity                     # Show AI peer identityhermes honcho identity <file>              # Seed AI peer identity from file (SOUL.md, etc.)hermes honcho migrate                      # Migration guide: OpenClaw → Hermes + Honcho
+
+### Doctor Integration[​](#doctor-integration "Direct link to Doctor Integration")
+
+`hermes doctor` includes a Honcho section that validates config, API key, and connection status.
+
+Migration[​](#migration "Direct link to Migration")
+---------------------------------------------------
+
+### From Local Memory[​](#from-local-memory "Direct link to From Local Memory")
+
+When Honcho activates on an instance with existing local history, migration runs automatically:
+
+1.  **Conversation history** — prior messages are uploaded as an XML transcript file
+2.  **Memory files** — existing `MEMORY.md`, `USER.md`, and `SOUL.md` are uploaded for context
+
+### From OpenClaw[​](#from-openclaw "Direct link to From OpenClaw")
+
+    hermes honcho migrate
+
+Walks through converting an OpenClaw native Honcho setup to the shared `~/.honcho/config.json` format.
+
+AI Peer Identity[​](#ai-peer-identity "Direct link to AI Peer Identity")
+------------------------------------------------------------------------
+
+Honcho can build a representation of the AI assistant over time (via `observe_me=True`). You can also seed the AI peer explicitly:
+
+    hermes honcho identity ~/.hermes/SOUL.md
+
+This uploads the file content through Honcho's observation pipeline. The AI peer representation is then injected into the system prompt alongside the user's, giving the agent awareness of its own accumulated identity.
+
+    hermes honcho identity --show
+
+Shows the current AI peer representation from Honcho.
+
+Use Cases[​](#use-cases "Direct link to Use Cases")
+---------------------------------------------------
+
+*   **Personalized responses** — Honcho learns how each user prefers to communicate
+*   **Goal tracking** — remembers what users are working toward across sessions
+*   **Expertise adaptation** — adjusts technical depth based on user's background
+*   **Cross-platform memory** — same user understanding across CLI, Telegram, Discord, etc.
+*   **Multi-user support** — each user (via messaging platforms) gets their own user model
+
+tip
+
+Honcho is fully opt-in — zero behavior change when disabled or unconfigured. All Honcho calls are non-fatal; if the service is unreachable, the agent continues normally.
+
+[Edit this page](https://github.com/NousResearch/hermes-agent/edit/main/website/docs/user-guide/features/honcho.md)
+
+[
+
+Previous
+
+MCP (Model Context Protocol)
+
+](/docs/user-guide/features/mcp)[
+
+Next
+
+Provider Routing
+
+](/docs/user-guide/features/provider-routing)
+
+*   [Works Alongside Built-in Memory](#works-alongside-built-in-memory)
+*   [Setup](#setup)
+    *   [Interactive Setup](#interactive-setup)
+    *   [Manual Setup](#manual-setup)
+*   [Configuration](#configuration)
+    *   [Global Config (`~/.honcho/config.json`)](#global-config-honchoconfigjson)
+    *   [Memory Modes](#memory-modes)
+    *   [Recall Modes](#recall-modes)
+    *   [Write Frequency](#write-frequency)
+    *   [Session Strategies](#session-strategies)
+    *   [Multi-host Configuration](#multi-host-configuration)
+    *   [Hermes Config (`~/.hermes/config.yaml`)](#hermes-config-hermesconfigyaml)
+*   [How It Works](#how-it-works)
+    *   [Async Context Pipeline](#async-context-pipeline)
+    *   [Dual-Peer Architecture](#dual-peer-architecture)
+    *   [Dynamic Reasoning Level](#dynamic-reasoning-level)
+    *   [Gateway Integration](#gateway-integration)
+*   [Tools](#tools)
+    *   [`honcho_profile`](#honcho_profile)
+    *   [`honcho_search`](#honcho_search)
+    *   [`honcho_context`](#honcho_context)
+    *   [`honcho_conclude`](#honcho_conclude)
+*   [CLI Commands](#cli-commands)
+    *   [Doctor Integration](#doctor-integration)
+*   [Migration](#migration)
+    *   [From Local Memory](#from-local-memory)
+    *   [From OpenClaw](#from-openclaw)
+*   [AI Peer Identity](#ai-peer-identity)
+*   [Use Cases](#use-cases)
+
+Docs
+
+*   [Getting Started](/docs/getting-started/quickstart)
+*   [User Guide](/docs/user-guide/cli)
+*   [Developer Guide](/docs/developer-guide/architecture)
+*   [Reference](/docs/reference/cli-commands)
+
+Community
+
+*   [Discord](https://discord.gg/NousResearch)
+*   [GitHub Discussions](https://github.com/NousResearch/hermes-agent/discussions)
+*   [Skills Hub](https://agentskills.io)
+
+More
+
+*   [GitHub](https://github.com/NousResearch/hermes-agent)
+*   [Nous Research](https://nousresearch.com)
+
+Built by [Nous Research](https://nousresearch.com) · MIT License · 2026
