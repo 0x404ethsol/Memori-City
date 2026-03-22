@@ -7,9 +7,17 @@ import { Globe, Users, Share2, Brain } from 'lucide-react';
 import { CodecPanel } from './CodecPanel';
 
 export const KnowledgeCommons: React.FC = () => {
-  const nodes = useLiveQuery(
-    () => db.vault.where('is_public').anyOf([1, true as any]).toArray()
-  ) || [];
+  const nodes = useLiveQuery(async () => {
+    try {
+      // Use filter for robustness if index is missing or type is mixed
+      return await db.vault
+        .filter(node => node.is_public === true || (node.is_public as any) === 1)
+        .toArray();
+    } catch (err) {
+      console.error('Failed to fetch public nodes:', err);
+      return [];
+    }
+  }) || [];
 
   return (
     <div className="w-full h-full flex flex-col gap-6 p-6 overflow-y-auto custom-scrollbar">

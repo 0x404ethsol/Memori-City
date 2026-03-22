@@ -8,6 +8,7 @@ import { MemoriCity } from './components/MemoriCity';
 import { ImportDock } from './components/ImportDock';
 import { KnowledgeCommons } from './components/KnowledgeCommons';
 import { MemoryService } from './services/memoryService';
+import { OrchestratorService } from './services/orchestratorService';
 import { useSettings } from './contexts/SettingsContext';
 import { 
   Terminal, 
@@ -33,7 +34,13 @@ import {
   Layers,
   History,
   Sparkles,
-  Trash2
+  Trash2,
+  Network,
+  Settings2,
+  Map,
+  Binary,
+  Eye,
+  Box
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -42,7 +49,14 @@ import { PredictiveKernel } from './components/PredictiveKernel';
 import { DeepResearch } from './components/DeepResearch';
 import { FileEditor } from './components/FileEditor';
 import { SettingsModal } from './components/SettingsModal';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { MobileView } from './components/MobileView';
+import { SkillManagerModal } from './components/SkillManagerModal';
+import { HermesImportModal } from './components/HermesImportModal';
+import { MusicPlayer } from './components/MusicPlayer';
+import { GlitchText } from './components/GlitchText';
+import { NeuralPulse } from './components/NeuralPulse';
+import { AgentTicker } from './components/AgentTicker';
+import { DitherBackground } from './components/DitherBackground';
 
 export default function App() {
   const nodes = useLiveQuery(() => db.vault.toArray()) || [];
@@ -50,6 +64,7 @@ export default function App() {
   
   const { settings } = useSettings();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isOrchestrating, setIsOrchestrating] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -60,13 +75,19 @@ export default function App() {
   const [isConsolidating, setIsConsolidating] = useState(false);
   const [relevantMemories, setRelevantMemories] = useState<MemoriNode[]>([]);
   const [pruneConfirm, setPruneConfirm] = useState<{ count: number; nodes: MemoriNode[] } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [skillManagerAgent, setSkillManagerAgent] = useState<AgentRecord | null>(null);
+  const [isHermesImportOpen, setIsHermesImportOpen] = useState(false);
+  const [isArchOpen, setIsArchOpen] = useState(false);
+  const [isDistrictManagerOpen, setIsDistrictManagerOpen] = useState(false);
+  const [isGlitching, setIsGlitching] = useState(false);
 
   // Global Search State
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchResults, setGlobalSearchResults] = useState<{
-    nodes: MemoriNode[],
-    files: any[],
-    skills: any[]
+    nodes: MemoriNode[];
+    files: any[];
+    skills: any[];
   }>({ nodes: [], files: [], skills: [] });
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -74,6 +95,59 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const memoryService = useMemo(() => settings ? new MemoryService(settings) : null, [settings]);
+  const orchestrator = useMemo(() => settings ? new OrchestratorService(settings) : null, [settings]);
+
+  // Mobile Detection
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Bootstrap Hermes Skill
+  useEffect(() => {
+    const bootstrapHermes = async () => {
+      const hermesSkill = await db.skills.where('name').equals('Hermes_Memory_Import').first();
+      if (!hermesSkill) {
+        await db.skills.add({
+          id: 'skill_hermes_import',
+          name: 'Hermes_Memory_Import',
+          description: 'Automatically connect and import memory files from local storage or cloud gateways.',
+          category: 'automation',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_active: true,
+          code: `
+# Skill: Hermes_Memory_Import
+
+## Operational Protocol
+1. **Discovery**: Scan target directories for .md files.
+2. **HITL (Human-in-the-Loop)**: Generate an Import_Manifest and request user confirmation.
+3. **Ingestion**: Read confirmed files and convert to MemoriNodes.
+4. **Linkage**: Search for semantic relations and integrate into the city graph.
+
+## Security
+- Local-first processing.
+- No shadow synchronization without consent.
+          `
+        });
+      }
+    };
+    bootstrapHermes();
+  }, []);
+
+  const handleOrchestrate = async () => {
+    if (!orchestrator) return;
+    setIsOrchestrating(true);
+    try {
+      await orchestrator.orchestrate();
+    } catch (err) {
+      console.error('Orchestration failed:', err);
+    } finally {
+      setIsOrchestrating(false);
+    }
+  };
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -368,40 +442,124 @@ export default function App() {
       // @ts-ignore - File System Access API
       const handle = await window.showDirectoryPicker();
       setObsidianHandle(handle);
-      setActiveImport('obsidian');
-      
-      // Basic scan of the vault
-      for await (const entry of handle.values()) {
-        if (entry.kind === 'file' && entry.name.endsWith('.md')) {
-          const file = await entry.getFile();
-          const text = await file.text();
-          
-          // Add to local DB if not exists
-          const nodeId = `obs_${entry.name.replace('.md', '')}`;
-          const existing = await db.vault.get(nodeId);
-          if (!existing) {
-            await db.vault.add({
-              id: nodeId,
-              node_id: nodeId,
-              memori_uri: `memori://obsidian/${entry.name}`,
-              created_at: new Date().toISOString(),
-              modified_at: new Date().toISOString(),
-              author_uid: 'local_user',
-              content: text,
-              l0_abstract: text.substring(0, 100) + '...',
-              tags: ['obsidian'],
-              district: 'obsidian'
-            });
-          }
-        }
-      }
+      setIsProcessing(true);
+      await syncObsidian(handle);
+      setActiveImport(null);
     } catch (err) {
-      console.error('Obsidian mount failed:', err);
+      console.error('Failed to mount Obsidian vault:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
+  const syncObsidian = async (handle: FileSystemDirectoryHandle) => {
+    setIsProcessing(true);
+    try {
+      // Recursive sync function
+      const syncDirectory = async (dirHandle: FileSystemDirectoryHandle, parentId: string | null = 'root') => {
+        // @ts-ignore - File System Access API
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'directory') {
+            // Check if folder exists
+            let folder = await db.files.where('name').equals(entry.name).and(f => f.parentId === parentId && f.type === 'folder').first();
+            if (!folder) {
+              const folderId = `folder_${Math.random().toString(36).substring(2, 10)}`;
+              folder = {
+                id: folderId,
+                name: entry.name,
+                type: 'folder',
+                parentId: parentId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              await db.files.add(folder);
+            }
+            // @ts-ignore
+            await syncDirectory(entry, folder.id);
+          } else if (entry.kind === 'file' && entry.name.endsWith('.md')) {
+            // @ts-ignore
+            const file = await entry.getFile();
+            const content = await file.text();
+            
+            // Check if file exists in this parent
+            const existing = await db.files.where('name').equals(entry.name).and(f => f.parentId === parentId).first();
+            
+            if (existing) {
+              if (existing.content !== content) {
+                await db.files.update(existing.id, {
+                  content,
+                  updated_at: new Date(file.lastModified).toISOString()
+                });
+              }
+            } else {
+              const fileId = `file_${Math.random().toString(36).substring(2, 10)}`;
+              await db.files.add({
+                id: fileId,
+                name: entry.name,
+                type: 'file',
+                parentId: parentId,
+                content,
+                created_at: new Date(file.lastModified).toISOString(),
+                updated_at: new Date(file.lastModified).toISOString()
+              });
+              
+              // Also add to vault (memori_nodes) if it's a new memory-worthy file
+              const nodeUri = `memori://obsidian/${entry.name.replace('.md', '')}`;
+              const nodeExists = await db.vault.where('memori_uri').equals(nodeUri).first();
+              if (!nodeExists) {
+                const nodeId = `node_${Math.random().toString(36).substring(2, 10)}`;
+                await db.vault.add({
+                  id: nodeId,
+                  node_id: nodeId,
+                  memori_uri: nodeUri,
+                  created_at: new Date(file.lastModified).toISOString(),
+                  modified_at: new Date(file.lastModified).toISOString(),
+                  author_uid: 'local_user',
+                  content,
+                  l0_abstract: content.substring(0, 200) + '...',
+                  tags: ['obsidian', 'imported'],
+                  district: 'obsidian'
+                });
+              }
+            }
+          }
+        }
+      };
+
+      await syncDirectory(handle);
+    } catch (err) {
+      console.error('Sync failed:', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (isMobile) {
+    return (
+      <div className="h-screen w-screen bg-void">
+        <MobileView 
+          nodes={nodes} 
+          agents={agents} 
+          onOpenSettings={() => setIsSettingsOpen(true)} 
+          onMountObsidian={mountObsidian}
+          onSetActiveImport={setActiveImport}
+          activeImport={activeImport}
+          onSetViewMode={setViewMode}
+          onOpenSkillManager={(agent) => setSkillManagerAgent(agent)}
+          onOpenHermesImport={() => setIsHermesImportOpen(true)}
+          globalSearchQuery={globalSearchQuery}
+          onSetGlobalSearchQuery={setGlobalSearchQuery}
+          globalSearchResults={globalSearchResults}
+        />
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-void overflow-hidden relative">
+      <DitherBackground />
+      <NeuralPulse />
       <div className="grid-bg" />
       <div className="crt-overlay" />
       
@@ -409,15 +567,28 @@ export default function App() {
       <div className="absolute top-20 left-10 opacity-5 pointer-events-none select-none -rotate-90">
         <span className="text-8xl font-black font-japanese">新次元</span>
       </div>
-      <div className="absolute bottom-20 right-10 opacity-5 pointer-events-none select-none rotate-90">
-        <span className="text-8xl font-black font-japanese">データ</span>
+      <div className="absolute bottom-20 right-10 opacity-10 pointer-events-none select-none rotate-90 overflow-hidden group">
+        <div className="absolute inset-0 bg-cover bg-center grayscale contrast-200 brightness-50 opacity-40 group-hover:opacity-100 transition-opacity" style={{ backgroundImage: `url('https://picsum.photos/seed/cyberpunk-girl/1080/1080?grayscale')` }} />
+        <span className="text-8xl font-black font-japanese relative z-10 mix-blend-overlay">データ</span>
+        {/* Dither Animation on the targeted element */}
+        <motion.div 
+          animate={{ x: [-10, 10, -10], y: [-10, 10, -10] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(circle, #00f3ff 1px, transparent 1px)`,
+            backgroundSize: '4px 4px',
+          }}
+        />
       </div>
 
       {/* Header */}
       <header className="h-12 border-b border-neon-cyan/30 flex items-center justify-between px-5 bg-void/80 backdrop-blur-xl z-20 relative">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
-            <h1 className="glitch-text text-xl tracking-tighter leading-none">Memori-City</h1>
+            <h1 className="text-xl font-display font-black italic tracking-tighter text-white leading-none">
+              <GlitchText text="MEMORI-CITY" />
+            </h1>
             <span className="text-[6px] font-mono text-neon-cyan/40 tracking-[0.4em] mt-1">
               SOVEREIGN_KERNEL_V4.20_STABLE
             </span>
@@ -602,6 +773,12 @@ export default function App() {
             >
               COMMONS
             </button>
+            <button 
+              onClick={() => setIsHermesImportOpen(true)}
+              className="px-2.5 py-1 transition-all text-[9px] font-mono uppercase tracking-widest text-neon-pink hover:bg-neon-pink/10 border border-neon-pink/20 ml-2"
+            >
+              HERMES
+            </button>
           </div>
           <button 
             onClick={() => setSidebarVisible(!sidebarVisible)}
@@ -617,10 +794,13 @@ export default function App() {
             onClick={() => setIsSettingsOpen(true)}
             className="p-1.5 border border-white/10 text-white/40 hover:text-white hover:border-white transition-all"
           >
-            <SettingsIcon size={16} />
+            <Settings2 size={16} />
           </button>
         </div>
       </header>
+      
+      {/* Agent Activity Ticker */}
+      <AgentTicker />
 
       {/* Main Content */}
       <main className={cn("flex-1 flex p-3 overflow-hidden relative z-10", sidebarVisible ? "gap-3" : "gap-0")}>
@@ -630,22 +810,58 @@ export default function App() {
           !sidebarVisible ? "w-0 opacity-0" : viewMode === 'city' ? "w-48 opacity-100" : "w-80 opacity-100"
         )}>
           <CodecPanel title="AGENT_SWARM_HUD" status="active" className="h-1/2 min-h-0">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 overflow-y-auto custom-scrollbar h-full pr-2">
               {agents.length === 0 ? (
                 <div className="text-[9px] font-mono text-gray-600 italic">No agents registered.</div>
               ) : (
                 agents.map(agent => (
-                  <div key={agent.id} className="p-2 border border-neon-cyan/10 bg-void/60 relative group">
+                  <div key={agent.id} className="p-3 border border-neon-cyan/10 bg-void/60 relative group hover:border-neon-cyan/40 transition-all">
                     <div className="absolute top-0 right-0 w-1 h-full bg-neon-cyan/20 group-hover:bg-neon-cyan transition-colors" />
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-display font-black text-neon-cyan uppercase tracking-wider">{agent.agent_type}</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Cpu size={12} className={cn(agent.status === 'running' ? "text-neon-green" : "text-white/20")} />
+                        <span className="text-[10px] font-display font-black text-neon-cyan uppercase tracking-wider">{agent.agent_type}</span>
+                      </div>
                       <div className="flex items-center gap-1">
-                        <div className="w-1 h-1 bg-neon-green rounded-full flicker-anim" />
-                        <span className="text-[7px] font-mono text-neon-green/60">ONLINE</span>
+                        <div className={cn("w-1 h-1 rounded-full", agent.status === 'running' ? "bg-neon-green flicker-anim" : "bg-white/20")} />
+                        <span className={cn("text-[7px] font-mono uppercase", agent.status === 'running' ? "text-neon-green/60" : "text-white/20")}>
+                          {agent.status}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-[9px] text-white/60 font-mono leading-tight bg-void/40 p-1.5 border-l border-neon-cyan/20 truncate">
-                      {agent.current_task}
+                    <div className="text-[9px] text-white/60 font-mono leading-tight bg-void/40 p-2 border-l border-neon-cyan/20 mb-3 italic">
+                      {agent.current_task || 'IDLE_WAITING_FOR_TASK'}
+                    </div>
+                    
+                    {/* Interactive Controls */}
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setSkillManagerAgent(agent);
+                        }}
+                        className="flex-1 py-1 bg-neon-cyan/10 border border-neon-cyan/30 text-[7px] font-mono text-neon-cyan uppercase hover:bg-neon-cyan hover:text-void transition-all"
+                      >
+                        Skills
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          const newStatus = agent.status === 'running' ? 'sleeping' : 'running';
+                          await db.agents.update(agent.id, { status: newStatus });
+                        }}
+                        className="flex-1 py-1 bg-neon-purple/10 border border-neon-purple/30 text-[7px] font-mono text-neon-purple uppercase hover:bg-neon-purple hover:text-white transition-all"
+                      >
+                        {agent.status === 'running' ? 'Sleep' : 'Wake'}
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          if (confirm(`Terminate agent ${agent.agent_id}?`)) {
+                            await db.agents.delete(agent.id);
+                          }
+                        }}
+                        className="px-2 py-1 bg-neon-pink/10 border border-neon-pink/30 text-[7px] font-mono text-neon-pink uppercase hover:bg-neon-pink hover:text-white transition-all"
+                      >
+                        Kill
+                      </button>
                     </div>
                   </div>
                 ))
@@ -758,15 +974,15 @@ export default function App() {
               </CodecPanel>
               
               {/* Multi-Modal Import Docks */}
-              <div className="grid grid-cols-4 gap-3 h-36">
-                <CodecPanel title="IMPORT_DOCK_ARRAY" className="col-span-3">
+              <div className="grid grid-cols-6 gap-3 h-36">
+                <CodecPanel title="IMPORT_DOCK_ARRAY" className="col-span-4">
                   <AnimatePresence mode="wait">
                     {!activeImport ? (
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 1.02 }}
-                        className="grid grid-cols-5 gap-3 h-full"
+                        className="grid grid-cols-4 gap-3 h-full"
                       >
                         <ImportDock 
                           icon={FolderOpen} 
@@ -793,15 +1009,36 @@ export default function App() {
                           icon={Brain} 
                           label="HERMES" 
                           description="LINK_MEMORY // ヘルメス" 
-                          onClick={() => setActiveImport('text')} 
+                          onClick={() => setIsHermesImportOpen(true)} 
                           color="var(--theme-pink)"
                         />
                         <ImportDock 
-                          icon={Layers} 
-                          label="RESEARCH" 
-                          description="SWARM_VORTEX // 研究" 
-                          onClick={() => setViewMode('research')} 
+                          icon={Plus} 
+                          label="QUICK_NOTE" 
+                          description="NEW_MEMORY // メモ" 
+                          onClick={() => setActiveImport('text')} 
+                          color="var(--theme-green)"
+                        />
+                        <ImportDock 
+                          icon={Mic} 
+                          label="NEURAL_LINK" 
+                          description="VOICE_STREAM // 音声" 
+                          onClick={() => setActiveImport('voice')} 
                           color="var(--theme-cyan)"
+                        />
+                        <ImportDock 
+                          icon={Map} 
+                          label="DISTRICTS" 
+                          description="REZONE_CITY // 地区" 
+                          onClick={() => setIsDistrictManagerOpen(true)} 
+                          color="var(--theme-yellow)"
+                        />
+                        <ImportDock 
+                          icon={Binary} 
+                          label="ARCH" 
+                          description="SYS_BLUEPRINT // 建築" 
+                          onClick={() => setIsArchOpen(true)} 
+                          color="var(--theme-purple)"
                         />
                       </motion.div>
                     ) : (
@@ -856,7 +1093,123 @@ export default function App() {
                             </div>
                           </div>
                         )}
-                        {activeImport !== 'text' && (
+                        {activeImport === 'obsidian' && (
+                          <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8">
+                            <div className="relative">
+                              <div className={cn(
+                                "w-20 h-20 border-2 rounded-xl flex items-center justify-center rotate-45 group-hover:rotate-90 transition-all duration-700",
+                                obsidianHandle ? "border-neon-green/40 bg-neon-green/5" : "border-neon-purple/40"
+                              )}>
+                                <div className="-rotate-45 group-hover:-rotate-90 transition-transform duration-700">
+                                  <HardDrive size={32} className={obsidianHandle ? "text-neon-green" : "text-neon-purple"} />
+                                </div>
+                              </div>
+                              <div className={cn(
+                                "absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full animate-pulse",
+                                obsidianHandle ? "bg-neon-green" : "bg-neon-purple"
+                              )}>
+                                {obsidianHandle ? <RefreshCw size={14} className="text-void" /> : <Plus size={14} className="text-void" />}
+                              </div>
+                            </div>
+                            
+                            <div className="text-center space-y-2">
+                              <h3 className={cn(
+                                "text-sm font-display font-black uppercase tracking-[0.3em]",
+                                obsidianHandle ? "text-neon-green" : "text-neon-purple"
+                              )}>
+                                {obsidianHandle ? 'Vault_Linked' : 'Obsidian_Vault_Sync'}
+                              </h3>
+                              <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest leading-relaxed max-w-[240px]">
+                                {obsidianHandle 
+                                  ? `Currently linked to: ${obsidianHandle.name}. Synchronize to update the Memori-City grid with the latest markdown nodes.`
+                                  : "Establish a neural link with your local Obsidian vault. All markdown nodes will be indexed into the Memori-City grid."}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col gap-3 w-full max-w-[240px]">
+                              <button 
+                                onClick={obsidianHandle ? () => syncObsidian(obsidianHandle) : mountObsidian}
+                                disabled={isProcessing}
+                                className={cn(
+                                  "w-full py-2 border font-display font-black text-[11px] uppercase tracking-[0.2em] transition-all relative group overflow-hidden",
+                                  obsidianHandle 
+                                    ? "bg-neon-green/10 border-neon-green/40 text-neon-green hover:bg-neon-green hover:text-void"
+                                    : "bg-neon-purple/10 border-neon-purple/40 text-neon-purple hover:bg-neon-purple hover:text-void"
+                                )}
+                              >
+                                <div className="absolute inset-0 warning-stripes opacity-0 group-hover:opacity-20 transition-opacity" />
+                                {isProcessing ? 'SYNCHRONIZING...' : obsidianHandle ? '[RUN_SYNC_CYCLE]' : '[SELECT_VAULT_DIRECTORY]'}
+                              </button>
+
+                              {obsidianHandle && (
+                                <button 
+                                  onClick={mountObsidian}
+                                  disabled={isProcessing}
+                                  className="w-full py-1.5 border border-white/10 text-white/40 hover:text-white hover:border-white/20 font-mono text-[9px] uppercase tracking-widest transition-all"
+                                >
+                                  Change_Vault_Handle
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-4 text-[7px] font-mono text-white/20 uppercase tracking-tighter">
+                              <span>Recursive_Scan: ENABLED</span>
+                              <span>•</span>
+                              <span>Auto_Node_Generation: ACTIVE</span>
+                            </div>
+                          </div>
+                        )}
+                        {activeImport === 'url' && (
+                          <div className="flex flex-col flex-1 min-h-0 gap-4 p-4">
+                            <div className="flex flex-col gap-2">
+                              <label className="text-[8px] font-mono text-neon-cyan uppercase tracking-widest">Cloud_Resource_URL</label>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text"
+                                  placeholder="https://cloud.memori.city/stream/..."
+                                  className="flex-1 bg-void/60 border border-neon-cyan/20 p-2 outline-none text-neon-cyan font-mono text-[10px] placeholder:text-neon-cyan/20"
+                                />
+                                <button className="px-4 py-1 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-display font-black text-[10px] uppercase tracking-widest hover:bg-neon-cyan hover:text-void transition-all">
+                                  Sync
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex-1 border border-dashed border-neon-cyan/10 flex flex-col items-center justify-center gap-2 opacity-40">
+                              <Globe size={24} className="text-neon-cyan" />
+                              <span className="text-[8px] font-mono uppercase tracking-widest">Awaiting_Cloud_Handshake...</span>
+                            </div>
+                          </div>
+                        )}
+                        {activeImport === 'voice' && (
+                          <div className="flex flex-col flex-1 min-h-0 items-center justify-center p-8 gap-6">
+                            <motion.div 
+                              animate={{ 
+                                scale: [1, 1.1, 1],
+                                borderColor: ['rgba(0, 243, 255, 0.2)', 'rgba(0, 243, 255, 0.6)', 'rgba(0, 243, 255, 0.2)']
+                              }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                              className="w-24 h-24 rounded-full border-2 flex items-center justify-center relative"
+                            >
+                              <Mic size={32} className="text-neon-cyan" />
+                              <div className="absolute inset-0 rounded-full bg-neon-cyan/5 animate-ping" />
+                            </motion.div>
+                            <div className="text-center space-y-2">
+                              <h3 className="text-sm font-display font-black text-neon-cyan uppercase tracking-[0.3em]">Neural_Link_Active</h3>
+                              <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest leading-relaxed">
+                                Streaming auditory data directly to the kernel. <br />
+                                Semantic extraction in progress...
+                              </p>
+                            </div>
+                            <div className="w-full max-w-[200px] h-1 bg-void border border-neon-cyan/10 overflow-hidden">
+                              <motion.div 
+                                animate={{ x: ['-100%', '100%'] }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                className="w-1/2 h-full bg-neon-cyan shadow-[0_0_10px_var(--theme-cyan)]"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {activeImport !== 'text' && activeImport !== 'obsidian' && activeImport !== 'url' && activeImport !== 'voice' && (
                           <div 
                             className={cn(
                               "flex-1 flex flex-col items-center justify-center gap-4 border border-dashed bg-void/20 transition-all",
@@ -938,7 +1291,82 @@ export default function App() {
                   </AnimatePresence>
                 </CodecPanel>
     
-                <CodecPanel title="HERMES_LINK_V1" className="col-span-1">
+                <CodecPanel 
+                  title="ORCHESTRATOR_V1" 
+                  className="col-span-1"
+                  ascii={`
+  [ORCH]
+   |--|
+   |--|
+                  `}
+                >
+                  <div className="flex flex-col gap-3 h-full">
+                    <div className="text-[8px] font-mono text-white/40 uppercase leading-tight tracking-wider flex justify-between">
+                      <span>Autonomous_City_Management_Core</span>
+                    </div>
+                    <div className="flex-1 flex flex-col gap-2">
+                      <motion.button 
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleOrchestrate}
+                        disabled={isOrchestrating}
+                        className={cn(
+                          "w-full flex-1 border font-display font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 relative overflow-hidden",
+                          isOrchestrating 
+                            ? "bg-neon-cyan/5 border-neon-cyan/20 text-neon-cyan/40 cursor-wait" 
+                            : "bg-neon-cyan/10 border-neon-cyan/40 text-neon-cyan hover:bg-neon-cyan hover:text-void"
+                        )}
+                      >
+                        {isOrchestrating ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            Thinking...
+                          </>
+                        ) : (
+                          <>
+                            <Workflow size={14} />
+                            Run_Orchestration
+                          </>
+                        )}
+                        {isOrchestrating && (
+                          <motion.div 
+                            className="absolute bottom-0 left-0 h-0.5 bg-neon-cyan"
+                            initial={{ width: 0 }}
+                            animate={{ width: '100%' }}
+                            transition={{ duration: 5, ease: "linear" }}
+                          />
+                        )}
+                      </motion.button>
+
+                      <div className="p-1.5 bg-void/40 border border-white/5 rounded space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[7px] font-mono text-white/40 uppercase">Active_Agents</span>
+                          <span className="text-[7px] font-mono text-neon-cyan">{agents.length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[7px] font-mono text-white/40 uppercase">Sub_Agents</span>
+                          <span className="text-[7px] font-mono text-neon-purple">{agents.filter(a => a.id.startsWith('pico-')).length}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-[8px] font-mono text-neon-cyan/40 uppercase mt-auto flex items-center justify-between border-t border-neon-cyan/10 pt-2">
+                      <span className="font-bold">ORCHESTRATOR_CORE</span>
+                      <span className={cn("neon-glow-cyan", isOrchestrating ? "animate-pulse" : "")}>
+                        {isOrchestrating ? '● EXECUTING' : '● READY'}
+                      </span>
+                    </div>
+                  </div>
+                </CodecPanel>
+
+                <CodecPanel 
+                  title="HERMES_LINK_V1" 
+                  className="col-span-1"
+                  ascii={`
+  [HERM]
+   /--\\
+   \\--/
+                  `}
+                >
                   <div className="flex flex-col gap-3 h-full">
                     <div className="text-[8px] font-mono text-white/40 uppercase leading-tight tracking-wider">
                       Connect_Hermes_Agent_via_Memori_Protocol
@@ -946,6 +1374,7 @@ export default function App() {
                     <div className="flex-1 flex flex-col gap-2">
                       <motion.div 
                         whileHover={{ x: 4, backgroundColor: 'color-mix(in srgb, var(--theme-pink) 10%, transparent)' }}
+                        onClick={() => setIsHermesImportOpen(true)}
                         className="p-2 border border-neon-pink/20 bg-void/60 flex items-center gap-2 group cursor-pointer relative overflow-hidden"
                       >
                         <div className="absolute left-0 top-0 w-1 h-full bg-neon-pink/40 group-hover:bg-neon-pink transition-colors" />
@@ -954,11 +1383,12 @@ export default function App() {
                       </motion.div>
                       <motion.div 
                         whileHover={{ x: 4, backgroundColor: 'color-mix(in srgb, var(--theme-cyan) 10%, transparent)' }}
+                        onClick={() => setIsArchOpen(true)}
                         className="p-2 border border-neon-cyan/20 bg-void/60 flex items-center gap-2 group cursor-pointer relative overflow-hidden"
                       >
                         <div className="absolute left-0 top-0 w-1 h-full bg-neon-cyan/40 group-hover:bg-neon-cyan transition-colors" />
                         <Code size={14} className="text-neon-cyan" />
-                        <span className="text-[9px] font-display font-black text-neon-cyan uppercase tracking-widest">ENDPOINT: /API</span>
+                        <span className="text-[9px] font-display font-black text-neon-cyan uppercase tracking-widest">ARCH: VIEW</span>
                       </motion.div>
                     </div>
                     <div className="text-[8px] font-mono text-neon-green/40 uppercase mt-auto flex items-center justify-between border-t border-neon-cyan/10 pt-2">
@@ -1158,6 +1588,212 @@ export default function App() {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      {/* Skill Manager Modal */}
+      <SkillManagerModal 
+        agent={skillManagerAgent} 
+        isOpen={!!skillManagerAgent} 
+        onClose={() => setSkillManagerAgent(null)} 
+      />
+
+      {/* Hermes Import Modal */}
+      <HermesImportModal 
+        isOpen={isHermesImportOpen} 
+        onClose={() => setIsHermesImportOpen(false)} 
+      />
+
+      {/* Music Player */}
+      <MusicPlayer />
+
+      {/* Glitch Overlay */}
+      <AnimatePresence>
+        {isGlitching && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] pointer-events-none mix-blend-difference"
+          >
+            <div className="absolute inset-0 bg-neon-cyan/10 animate-pulse" />
+            <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,255,255,0.1)_2px,rgba(0,255,255,0.1)_4px)]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Architecture Modal */}
+      <AnimatePresence>
+        {isArchOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsArchOpen(false)}
+              className="absolute inset-0 bg-void/90 backdrop-blur-xl"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-4xl h-full max-h-[80vh] relative z-10"
+            >
+              <CodecPanel title="SYSTEM_ARCHITECTURE_BLUEPRINT" className="h-full">
+                <div className="flex flex-col h-full gap-6 overflow-auto p-4">
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="col-span-1 space-y-4">
+                      <div className="p-4 border border-neon-cyan/40 bg-neon-cyan/5 rounded">
+                        <h3 className="text-neon-cyan font-display font-black text-sm mb-2 uppercase tracking-widest">Orchestrator</h3>
+                        <p className="text-[10px] text-white/60 leading-relaxed font-mono">
+                          The central intelligence core. Analyzes city state, manages memory clusters, and delegates tasks to specialized sub-agents.
+                        </p>
+                      </div>
+                      <div className="flex justify-center">
+                        <div className="w-0.5 h-8 bg-neon-cyan/20" />
+                      </div>
+                      <div className="p-4 border border-neon-purple/40 bg-neon-purple/5 rounded">
+                        <h3 className="text-neon-purple font-display font-black text-sm mb-2 uppercase tracking-widest">Sub-Agents</h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-neon-green" />
+                            <span className="text-[9px] font-mono text-white/80">JANITOR: Cleanup & Optimization</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan" />
+                            <span className="text-[9px] font-mono text-white/80">LINKER: Semantic Relationship Mapping</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-neon-pink" />
+                            <span className="text-[9px] font-mono text-white/80">BUILDER: Node Generation & Structuring</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="col-span-2 space-y-6">
+                      <div className="border border-white/10 bg-void/40 p-6 rounded relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-2 opacity-10">
+                          <Network size={48} />
+                        </div>
+                        <h2 className="text-white font-display font-black text-xl mb-4 uppercase tracking-tighter italic">NEURAL_CITY_TOPOLOGY</h2>
+                        <div className="space-y-4 font-mono text-[11px] text-white/40">
+                          <p>Memori-City operates on a decentralized graph architecture where every piece of information is a node in a multi-dimensional space.</p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <div className="text-neon-cyan uppercase text-[9px]">Memory_Layer</div>
+                              <div className="h-1 w-full bg-white/5 overflow-hidden">
+                                <div className="h-full bg-neon-cyan w-3/4" />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-neon-purple uppercase text-[9px]">Agent_Swarm</div>
+                              <div className="h-1 w-full bg-white/5 overflow-hidden">
+                                <div className="h-full bg-neon-purple w-1/2" />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="p-3 bg-white/5 border border-white/10 rounded font-mono text-[9px] leading-relaxed">
+                            <span className="text-neon-green">SYSTEM_LOG:</span> Orchestrator initialized. Sub-agents deployed to District 7. Memory pruning in progress. Semantic link density at 84%.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 border border-white/10 bg-void/40 rounded">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Database size={14} className="text-neon-cyan" />
+                            <span className="text-[10px] font-display font-black text-white uppercase">Data_Persistence</span>
+                          </div>
+                          <p className="text-[9px] text-white/40 font-mono">IndexedDB via Dexie.js ensures low-latency local storage for millions of nodes.</p>
+                        </div>
+                        <div className="p-4 border border-white/10 bg-void/40 rounded">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Zap size={14} className="text-neon-yellow" />
+                            <span className="text-[10px] font-display font-black text-white uppercase">Real-time_Sync</span>
+                          </div>
+                          <p className="text-[9px] text-white/40 font-mono">WebSocket streams provide instantaneous updates across the swarm.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setIsArchOpen(false)}
+                    className="mt-auto w-full py-3 bg-white/5 border border-white/10 text-[10px] font-display font-black text-white/40 uppercase tracking-[0.5em] hover:text-white hover:bg-white/10 transition-all"
+                  >
+                    [CLOSE_BLUEPRINT]
+                  </button>
+                </div>
+              </CodecPanel>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* District Manager Modal */}
+      <AnimatePresence>
+        {isDistrictManagerOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDistrictManagerOpen(false)}
+              className="absolute inset-0 bg-void/90 backdrop-blur-xl"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-2xl h-full max-h-[60vh] relative z-10"
+            >
+              <CodecPanel title="DISTRICT_MANAGER_V1" className="h-full">
+                <div className="flex flex-col h-full gap-4 overflow-auto p-4">
+                  <div className="space-y-4">
+                    {[
+                      { id: 'D1', name: 'CENTRAL_HUB', status: 'STABLE', load: 45, color: 'neon-cyan' },
+                      { id: 'D2', name: 'NEURAL_NETWORKS', status: 'ACTIVE', load: 82, color: 'neon-purple' },
+                      { id: 'D3', name: 'DATA_ARCHIVES', status: 'IDLE', load: 12, color: 'neon-green' },
+                      { id: 'D4', name: 'VOID_SECTOR', status: 'WARNING', load: 94, color: 'neon-pink' },
+                    ].map((district) => (
+                      <div key={district.id} className="p-3 border border-white/10 bg-white/5 rounded flex items-center justify-between group hover:border-white/20 transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 border border-${district.color}/40 flex items-center justify-center font-display font-black text-xs text-${district.color}`}>
+                            {district.id}
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-display font-black text-white uppercase tracking-widest">{district.name}</div>
+                            <div className="text-[8px] font-mono text-white/40 uppercase tracking-widest">STATUS: {district.status}</div>
+                          </div>
+                        </div>
+                        <div className="w-32 space-y-1">
+                          <div className="flex justify-between text-[7px] font-mono text-white/40 uppercase">
+                            <span>LOAD</span>
+                            <span>{district.load}%</span>
+                          </div>
+                          <div className="h-1 w-full bg-white/5 overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${district.load}%` }}
+                              className={`h-full bg-${district.color}`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <button 
+                    onClick={() => setIsDistrictManagerOpen(false)}
+                    className="mt-auto w-full py-3 bg-white/5 border border-white/10 text-[10px] font-display font-black text-white/40 uppercase tracking-[0.5em] hover:text-white hover:bg-white/10 transition-all"
+                  >
+                    [EXIT_DISTRICT_MANAGER]
+                  </button>
+                </div>
+              </CodecPanel>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Footer Status Bar */}
       <footer className="h-8 border-t border-neon-cyan/30 bg-void/80 backdrop-blur-xl flex items-center px-6 justify-between z-20 relative">

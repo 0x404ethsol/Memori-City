@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
 import { 
   Settings, 
   Monitor, 
@@ -47,6 +49,8 @@ const categories: SettingsCategory[] = [
   { id: 'appearance', label: 'Appearance', icon: Palette, section: 'options' },
   { id: 'hotkeys', label: 'Hotkeys', icon: Keyboard, section: 'options' },
   { id: 'keychain', label: 'Keychain', icon: Key, section: 'options' },
+  { id: 'deep-research', label: 'Deep Research', icon: Brain, section: 'options' },
+  { id: 'armory', label: 'Sub-Agent Armory', icon: ShieldCheck, section: 'options' },
   { id: 'core', label: 'Core plugins', icon: Puzzle, section: 'options' },
   { id: 'community', label: 'Community plugins', icon: Users, section: 'options' },
   // Core plugins
@@ -65,6 +69,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { settings, updateSettings, isLoaded } = useSettings();
+  const skills = useLiveQuery(() => db.skills.toArray()) || [];
   const [activeCategory, setActiveCategory] = useState('general');
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testError, setTestError] = useState<string | null>(null);
@@ -123,6 +128,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const renderCategoryContent = () => {
     switch (activeCategory) {
+      case 'armory':
+        return (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col gap-2 border-b border-white/10 pb-6">
+              <h3 className="text-2xl font-serif italic text-white tracking-tight">Sub-Agent Armory</h3>
+              <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Equip your pico-agents with specialized skills</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              {(['janitor', 'linker', 'builder', 'researcher', 'archivist', 'notary'] as const).map((type) => (
+                <div key={type} className="p-6 bg-white/5 border border-white/10 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-neon-blue/10 flex items-center justify-center text-neon-blue border border-neon-blue/20">
+                        <ShieldCheck size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-mono font-bold text-white uppercase tracking-wider">{type}</h4>
+                        <p className="text-[9px] font-mono text-gray-500 uppercase tracking-widest">Preset capabilities for {type} agents</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-mono text-gray-500 uppercase tracking-widest block">Equipped Skills</label>
+                    <div className="flex flex-wrap gap-2">
+                      {skills.map(skill => {
+                        const isEquipped = settings.subagent_presets?.[type]?.skills?.includes(skill.id);
+                        return (
+                          <button
+                            key={skill.id}
+                            onClick={() => {
+                              const currentPresets = settings.subagent_presets || {};
+                              const currentTypePreset = currentPresets[type] || { skills: [] };
+                              const currentSkills = currentTypePreset.skills || [];
+                              const nextSkills = isEquipped
+                                ? currentSkills.filter(id => id !== skill.id)
+                                : [...currentSkills, skill.id];
+                              
+                              updateSettings({
+                                subagent_presets: {
+                                  ...currentPresets,
+                                  [type]: { skills: nextSkills }
+                                }
+                              });
+                            }}
+                            className={cn(
+                              "px-3 py-1.5 text-[9px] font-mono border rounded-full transition-all flex items-center gap-2",
+                              isEquipped
+                                ? "bg-neon-blue border-neon-blue text-void font-bold shadow-[0_0_10px_rgba(0,243,255,0.3)]"
+                                : "border-white/10 text-white/40 hover:border-white/30"
+                            )}
+                          >
+                            {skill.name}
+                            {isEquipped && <Zap size={8} />}
+                          </button>
+                        );
+                      })}
+                      {skills.length === 0 && (
+                        <p className="text-[9px] font-mono text-gray-600 italic uppercase">No skills forged yet. Visit the Skill Forge to create some.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
       case 'general':
         return (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -353,10 +427,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <section className="space-y-6">
               <div className="space-y-1">
                 <h3 className="text-sm font-display font-black text-white uppercase tracking-widest">LLM Configuration</h3>
-                <p className="text-[10px] font-mono text-white/40 uppercase">Bring your own keys or connect to local models.</p>
+                <p className="text-[10px] font-mono text-white/40 uppercase">Bring your own keys or connect to local models. Memori-City supports local Ollama instances, OpenAI, Anthropic, and custom OpenAI-compatible endpoints.</p>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[9px] font-mono text-white/40 uppercase">Provider</label>
                   <select 
@@ -368,6 +442,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
                     <option value="ollama">Ollama (Local)</option>
+                    <option value="webgpu">WebGPU (Local Transformers.js)</option>
                     <option value="custom">Custom Endpoint</option>
                   </select>
                 </div>
@@ -383,7 +458,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
               </div>
 
-              {(settings.llm.provider !== 'ollama') && (
+              {(settings.llm.provider !== 'ollama' && settings.llm.provider !== 'webgpu') && (
                 <div className="space-y-2">
                   <label className="text-[9px] font-mono text-white/40 uppercase">API Key</label>
                   <input 
@@ -393,6 +468,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     className="w-full bg-void border border-white/10 p-2 text-[10px] font-mono text-neon-cyan outline-none focus:border-neon-cyan"
                     placeholder="ENTER_API_KEY..."
                   />
+                </div>
+              )}
+
+              {settings.llm.provider === 'webgpu' && (
+                <div className="p-4 bg-neon-cyan/5 border border-neon-cyan/20 rounded-lg space-y-2">
+                  <div className="flex items-center gap-2 text-neon-cyan">
+                    <Cpu size={14} />
+                    <span className="text-[10px] font-display font-black uppercase tracking-widest">WebGPU Acceleration</span>
+                  </div>
+                  <p className="text-[9px] font-mono text-white/60 uppercase leading-relaxed">
+                    This will download the model (approx. 500MB - 1GB) to your browser's cache. 
+                    Ensure you have a compatible browser (Chrome 113+, Edge 113+) and hardware.
+                  </p>
                 </div>
               )}
 
@@ -474,6 +562,112 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   {isUpdatingEncryption ? <Loader2 size={12} className="animate-spin" /> : null}
                   {isUpdatingEncryption ? 'Updating...' : 'Update'}
                 </button>
+              </div>
+            </section>
+          </div>
+        );
+      case 'deep-research':
+        const updateDeepResearch = (updates: Partial<typeof settings.deepResearch>) => {
+          if (!settings.deepResearch) return;
+          updateSettings({ deepResearch: { ...settings.deepResearch, ...updates } });
+        };
+
+        const updateDeepResearchLLM = (updates: Partial<LLMConfig>) => {
+          if (!settings.deepResearch?.llm) return;
+          updateDeepResearch({ llm: { ...settings.deepResearch.llm, ...updates } });
+        };
+
+        return (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <section className="space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-display font-black text-white uppercase tracking-widest">Research Protocol</h3>
+                <p className="text-[10px] font-mono text-white/40 uppercase">Configure the Deep Research agent for autonomous knowledge synthesis.</p>
+              </div>
+              
+              <div className="flex items-center justify-between p-4 bg-void/40 border border-white/5">
+                <div className="space-y-1">
+                  <h4 className="text-[10px] font-mono text-white uppercase">Use Local Ollama</h4>
+                  <p className="text-[8px] font-mono text-white/20 uppercase">Prioritize local inference for privacy-first research.</p>
+                </div>
+                <button 
+                  onClick={() => updateDeepResearch({ useLocalOllama: !settings.deepResearch?.useLocalOllama })}
+                  className={cn(
+                    "w-10 h-5 rounded-full relative transition-colors",
+                    settings.deepResearch?.useLocalOllama ? "bg-neon-cyan" : "bg-white/10"
+                  )}
+                >
+                  <motion.div 
+                    animate={{ x: settings.deepResearch?.useLocalOllama ? 22 : 2 }}
+                    className="absolute top-1 left-0 w-3 h-3 bg-white rounded-full shadow-lg"
+                  />
+                </button>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-mono text-white/40 uppercase">Research LLM Provider</label>
+                  <select 
+                    value={settings.deepResearch?.llm?.provider}
+                    onChange={(e) => updateDeepResearchLLM({ provider: e.target.value as any })}
+                    className="w-full bg-void border border-white/10 text-white text-[10px] font-mono p-2 outline-none focus:border-neon-cyan uppercase"
+                  >
+                    <option value="gemini">Google Gemini</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="ollama">Ollama (Local)</option>
+                    <option value="custom">Custom Endpoint</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-mono text-white/40 uppercase">Model Name</label>
+                  <input 
+                    type="text" 
+                    value={settings.deepResearch?.llm?.modelName}
+                    onChange={(e) => updateDeepResearchLLM({ modelName: e.target.value })}
+                    className="w-full bg-void border border-white/10 p-2 text-[10px] font-mono text-white outline-none focus:border-neon-cyan"
+                    placeholder="e.g. llama3, gpt-4o, gemini-1.5-pro"
+                  />
+                </div>
+
+                {(settings.deepResearch?.llm?.provider === 'ollama' || settings.deepResearch?.llm?.provider === 'custom') && (
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-mono text-white/40 uppercase">Base URL</label>
+                    <input 
+                      type="text" 
+                      value={settings.deepResearch?.llm?.baseUrl || ''}
+                      onChange={(e) => updateDeepResearchLLM({ baseUrl: e.target.value })}
+                      className="w-full bg-void border border-white/10 p-2 text-[10px] font-mono text-white outline-none focus:border-neon-cyan"
+                      placeholder={settings.deepResearch?.llm?.provider === 'ollama' ? "http://localhost:11434" : "https://api.custom.com/v1"}
+                    />
+                  </div>
+                )}
+
+                {settings.deepResearch?.llm?.provider !== 'ollama' && (
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-mono text-white/40 uppercase">API Key</label>
+                    <input 
+                      type="password" 
+                      value={settings.deepResearch?.llm?.apiKey || ''}
+                      onChange={(e) => updateDeepResearchLLM({ apiKey: e.target.value })}
+                      className="w-full bg-void border border-white/10 p-2 text-[10px] font-mono text-neon-cyan outline-none focus:border-neon-cyan"
+                      placeholder="ENTER_API_KEY..."
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-mono text-white/40 uppercase">Max Iterations ({settings.deepResearch?.maxIterations})</label>
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="20" 
+                    value={settings.deepResearch?.maxIterations}
+                    onChange={(e) => updateDeepResearch({ maxIterations: parseInt(e.target.value) })}
+                    className="w-full accent-neon-cyan"
+                  />
+                </div>
               </div>
             </section>
           </div>

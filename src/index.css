@@ -229,3 +229,30 @@
   text-shadow: 0 0 10px theme('colors.neon-pink');
 }
 
+.dither-overlay {
+  @apply absolute inset-0 pointer-events-none z-10;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAAXNSR0IArs4c6QAAACJJREFUGFdjZEACDAwM/xkYGBgY4YIICmCCIApggmAKYIIgCgC8BAQD69u6ewAAAABJRU5ErkJggg==");
+  background-size: 4px 4px;
+  opacity: 0.15;
+  mix-blend-mode: overlay;
+}
+
+.hermes-logo-container {
+  @apply relative overflow-hidden border border-neon-pink/30 bg-void;
+  aspect-ratio: 1;
+}
+
+.hermes-logo-container img {
+  @apply w-full h-full object-cover grayscale contrast-125;
+  filter: brightness(0.8) sepia(0.2) hue-rotate(280deg);
+}
+
+@keyframes dither-move {
+  0% { background-position: 0 0; }
+  100% { background-position: 4px 4px; }
+}
+
+.animate-dither {
+  animation: dither-move 0.2s steps(2) infinite;
+}
+

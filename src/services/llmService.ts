@@ -22,6 +22,8 @@ export class LLMService {
         return this.callOllama(prompt, systemInstruction);
       case 'custom':
         return this.callCustom(prompt, systemInstruction);
+      case 'webgpu':
+        return this.callWebGPU(prompt, systemInstruction);
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -178,5 +180,10 @@ export class LLMService {
     const data = await response.json();
     // Assuming OpenAI-compatible response format for custom endpoints
     return data.choices?.[0]?.message?.content || data.response || JSON.stringify(data);
+  }
+
+  private async callWebGPU(prompt: string, systemInstruction?: string): Promise<string> {
+    const { localLLM } = await import('./localLLMService');
+    return localLLM.generate(prompt, systemInstruction);
   }
 }

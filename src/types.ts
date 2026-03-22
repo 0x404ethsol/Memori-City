@@ -51,6 +51,8 @@ export interface AgentRecord {
   thinking_log?: string[];
   target_building?: string;
   current_pos?: [number, number, number];
+  assigned_nodes?: string[]; // IDs of nodes to process
+  equipped_skills?: string[]; // IDs of skills to use
 }
 
 export interface ResearchTask {
@@ -77,10 +79,16 @@ export interface MetaSkill extends Skill {
 }
 
 export interface LLMConfig {
-  provider: 'gemini' | 'openai' | 'anthropic' | 'ollama' | 'custom';
+  provider: 'gemini' | 'openai' | 'anthropic' | 'ollama' | 'custom' | 'webgpu';
   apiKey?: string;
   baseUrl?: string;
   modelName: string;
+}
+
+export interface DeepResearchConfig {
+  llm: LLMConfig;
+  useLocalOllama: boolean;
+  maxIterations: number;
 }
 
 export interface AppSettings {
@@ -94,9 +102,15 @@ export interface AppSettings {
   activePlugins: string[];
   language: string;
   llm: LLMConfig;
+  deepResearch: DeepResearchConfig;
   encryptionSecret?: string;
   defaultNoteLocation: 'root' | 'current' | 'folder';
   deleteBehavior: 'trash' | 'dot-trash' | 'permanent';
+  subagent_presets?: {
+    [key: string]: {
+      skills: string[];
+    }
+  };
 }
 
 export interface FileNode {

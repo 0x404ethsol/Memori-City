@@ -12,9 +12,10 @@ interface CodecPanelProps {
   className?: string;
   title?: string;
   status?: 'active' | 'idle' | 'warning';
+  ascii?: string;
 }
 
-export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, title, status }) => {
+export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, title, status, ascii }) => {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -28,6 +29,13 @@ export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, tit
       <div className="absolute top-0 right-0 p-1 opacity-10 pointer-events-none select-none">
         <span className="text-[8px] font-japanese">システムステータス</span>
       </div>
+
+      {/* ASCII Art Overlay (Optional) */}
+      {ascii && (
+        <div className="absolute top-12 right-4 opacity-5 pointer-events-none select-none font-mono text-[6px] leading-[1] whitespace-pre text-neon-cyan z-0 group-hover:opacity-10 transition-opacity">
+          {ascii}
+        </div>
+      )}
 
       {title && (
         <div className="flex items-center justify-between border-b border-neon-cyan/30 pb-1.5 mb-0.5 relative z-10">

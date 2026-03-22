@@ -5,13 +5,14 @@ import {
   PerspectiveCamera, 
   Text, 
   Stars,
-  Sky
+  Sky,
+  Html
 } from '@react-three/drei';
 import * as THREE from 'three';
 import { MemoriNode, AgentRecord, ResearchTask } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import { Settings2 } from 'lucide-react';
+import { Settings2, Zap, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -320,6 +321,7 @@ const AgentBot = ({ agent, themeColors }: { agent: AgentRecord, themeColors: any
   const meshRef = useRef<THREE.Mesh>(null);
   const [targetPos, setTargetPos] = React.useState(new THREE.Vector3(0, 0, 0));
   const isThinking = !!agent.thinking_log?.length;
+  const hasTask = !!agent.current_task;
   
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -328,7 +330,7 @@ const AgentBot = ({ agent, themeColors }: { agent: AgentRecord, themeColors: any
     if (state.clock.elapsedTime % 5 < 0.1) {
       setTargetPos(new THREE.Vector3(
         (Math.random() - 0.5) * 40,
-        Math.random() * 10,
+        Math.random() * 10 + 2,
         (Math.random() - 0.5) * 40
       ));
     }
@@ -336,24 +338,25 @@ const AgentBot = ({ agent, themeColors }: { agent: AgentRecord, themeColors: any
     meshRef.current.position.lerp(targetPos, 0.02);
     meshRef.current.rotation.y += isThinking ? 0.2 : 0.05;
     
-    if (isThinking) {
+    if (isThinking || hasTask) {
       meshRef.current.position.y += Math.sin(state.clock.elapsedTime * 10) * 0.05;
     }
   });
 
   const color = agent.agent_type === 'builder' ? themeColors.green : themeColors.cyan;
   const thinkingColor = themeColors.pink;
+  const taskColor = themeColors.yellow;
 
   return (
     <group>
       <mesh ref={meshRef}>
         <octahedronGeometry args={[0.3, 0]} />
         <meshStandardMaterial 
-          color={isThinking ? thinkingColor : color} 
-          emissive={isThinking ? thinkingColor : color} 
-          emissiveIntensity={isThinking ? 10 : 5} 
+          color={isThinking ? thinkingColor : hasTask ? taskColor : color} 
+          emissive={isThinking ? thinkingColor : hasTask ? taskColor : color} 
+          emissiveIntensity={isThinking ? 15 : hasTask ? 8 : 5} 
         />
-        <pointLight color={isThinking ? thinkingColor : color} intensity={isThinking ? 5 : 2} distance={5} />
+        <pointLight color={isThinking ? thinkingColor : hasTask ? taskColor : color} intensity={isThinking ? 5 : 2} distance={5} />
         
         {/* Thinking Halo */}
         {isThinking && (
@@ -362,6 +365,59 @@ const AgentBot = ({ agent, themeColors }: { agent: AgentRecord, themeColors: any
             <meshStandardMaterial color={thinkingColor} emissive={thinkingColor} emissiveIntensity={2} transparent opacity={0.5} />
           </mesh>
         )}
+
+        {/* Task Aura (Anime Style) */}
+        {hasTask && (
+          <group>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.4, 0.45, 32]} />
+              <meshStandardMaterial color={taskColor} emissive={taskColor} emissiveIntensity={5} transparent opacity={0.3} />
+            </mesh>
+            {/* Floating Particles */}
+            {Array.from({ length: 4 }).map((_, i) => (
+              <mesh key={i} position={[
+                Math.cos(i * Math.PI / 2) * 0.6,
+                Math.sin(i * Math.PI / 2) * 0.6,
+                0
+              ]}>
+                <sphereGeometry args={[0.05, 8, 8]} />
+                <meshStandardMaterial color={taskColor} emissive={taskColor} emissiveIntensity={10} />
+              </mesh>
+            ))}
+          </group>
+        )}
+
+        {/* Floating Task Text */}
+        <Html position={[0, 1.2, 0]} center distanceFactor={10}>
+          <AnimatePresence>
+            {hasTask && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.8 }}
+                className="whitespace-nowrap flex flex-col items-center"
+              >
+                <div className="px-2 py-0.5 bg-void/80 border border-neon-yellow/50 backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-0.5 bg-neon-yellow/30 animate-pulse" />
+                  <div className="flex items-center gap-1.5">
+                    <Zap size={8} className="text-neon-yellow animate-pulse" />
+                    <span className="text-[8px] font-mono text-neon-yellow uppercase tracking-widest font-bold">
+                      {agent.agent_type} // {agent.status}
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-display font-black text-white mt-0.5 tracking-tight border-t border-white/10 pt-0.5">
+                    {agent.current_task}
+                  </div>
+                  {/* Anime-style decorative corners */}
+                  <div className="absolute top-0 left-0 w-1 h-1 border-t border-l border-neon-yellow" />
+                  <div className="absolute bottom-0 right-0 w-1 h-1 border-b border-r border-neon-yellow" />
+                </div>
+                {/* Connector Line */}
+                <div className="w-px h-4 bg-gradient-to-b from-neon-yellow/50 to-transparent" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Html>
       </mesh>
     </group>
   );

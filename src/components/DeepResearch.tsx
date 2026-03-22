@@ -48,7 +48,7 @@ export function DeepResearch() {
       verification_score: 0,
       pico_claws: picoClaws,
       iterations: 0,
-      max_iterations: 3,
+      max_iterations: settings.deepResearch?.maxIterations || 3,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -61,7 +61,21 @@ export function DeepResearch() {
 
   const performRealResearch = async (id: string, researchQuery: string) => {
     if (!settings) return;
-    const llm = new LLMService(settings.llm);
+    
+    // Use the specialized Deep Research LLM config
+    let llmConfig = settings.deepResearch?.llm || settings.llm;
+    
+    // Override with local Ollama if flag is set
+    if (settings.deepResearch?.useLocalOllama) {
+      llmConfig = {
+        ...llmConfig,
+        provider: 'ollama',
+        baseUrl: llmConfig.baseUrl || 'http://localhost:11434',
+        modelName: llmConfig.modelName || 'llama3'
+      };
+    }
+    
+    const llm = new LLMService(llmConfig);
     
     try {
       // Step 1: Searching
