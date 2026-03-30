@@ -351,17 +351,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <h3 className="text-sm font-display font-black text-white uppercase tracking-widest">Visual Theme</h3>
                 <p className="text-[10px] font-mono text-white/40 uppercase">Adjust the overall color palette and background visuals.</p>
               </div>
-              <div className="flex bg-void border border-white/10 p-1">
-                {['cyberpunk', 'scifi', 'minimalist'].map(t => (
+              <div className="flex flex-wrap gap-1 bg-void border border-white/10 p-1">
+                {['cyberpunk', 'scifi', 'minimalist', 'retro-futurism', 'organic-growth', 'deep-sea'].map(t => (
                   <button 
                     key={t}
                     onClick={() => updateSettings({ visualTheme: t as any })}
                     className={cn(
-                      "px-3 py-1 text-[9px] font-mono uppercase tracking-widest transition-all",
+                      "px-3 py-1 text-[9px] font-mono uppercase tracking-widest transition-all whitespace-nowrap",
                       (settings.visualTheme || 'cyberpunk') === t ? "bg-white text-void font-bold" : "text-white/40 hover:text-white"
                     )}
                   >
-                    {t}
+                    {t.replace('-', ' ')}
                   </button>
                 ))}
               </div>

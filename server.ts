@@ -2,12 +2,21 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Server } from "socket.io";
+import { createServer } from "http";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
   const PORT = 3000;
 
   app.use(express.json());
@@ -65,7 +74,47 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  // --- Socket.io Collaboration Logic ---
+  io.on("connection", (socket) => {
+    console.log("User connected to Swarm:", socket.id);
+
+    socket.on("join-room", (roomId) => {
+      socket.join(roomId);
+      console.log(`User ${socket.id} joined Swarm Room: ${roomId}`);
+      
+      // Update presence in room
+      const room = io.sockets.adapter.rooms.get(roomId);
+      const count = room ? room.size : 0;
+      io.to(roomId).emit("presence-update", count);
+    });
+
+    socket.on("memory-added", (data) => {
+      const { roomId, memory } = data;
+      // Broadcast to everyone else in the room
+      socket.to(roomId).emit("remote-memory-added", memory);
+    });
+
+    socket.on("memory-deleted", (data) => {
+      const { roomId, memoryId } = data;
+      socket.to(roomId).emit("remote-memory-deleted", memoryId);
+    });
+
+    socket.on("disconnecting", () => {
+      for (const roomId of socket.rooms) {
+        if (roomId !== socket.id) {
+          const room = io.sockets.adapter.rooms.get(roomId);
+          const count = room ? room.size - 1 : 0;
+          io.to(roomId).emit("presence-update", count);
+        }
+      }
+    });
+
+    socket.on("disconnect", () => {
+      console.log("User disconnected from Swarm:", socket.id);
+    });
+  });
+
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Memori-City Kernel running on http://localhost:${PORT}`);
     console.log(`Hermes Agent Endpoint: http://localhost:${PORT}/api/hermes/memory`);
   });

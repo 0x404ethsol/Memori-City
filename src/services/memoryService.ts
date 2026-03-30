@@ -29,7 +29,7 @@ export class MemoryService {
   /**
    * Adds a new memory node with vector embeddings
    */
-  async addMemory(content: string, metadata?: Partial<MemoriNode>): Promise<string> {
+  async addMemory(content: string, metadata?: Partial<MemoriNode>): Promise<MemoriNode> {
     const id = crypto.randomUUID();
     
     // Generate embedding for semantic search
@@ -54,7 +54,7 @@ export class MemoryService {
     };
 
     await db.vault.put(node);
-    return id;
+    return node;
   }
 
   /**

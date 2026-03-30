@@ -13,14 +13,15 @@ interface CodecPanelProps {
   title?: string;
   status?: 'active' | 'idle' | 'warning';
   ascii?: string;
+  onClose?: () => void;
 }
 
-export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, title, status, ascii }) => {
+export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, title, status, ascii, onClose }) => {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("codec-panel p-3 flex flex-col gap-2 relative group overflow-hidden", className)}
+      className={cn("codec-panel dither-shadow p-2 flex flex-col gap-1.5 relative group overflow-hidden", className)}
     >
       {/* Scanline effect */}
       <div className="scan-line" />
@@ -38,25 +39,35 @@ export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, tit
       )}
 
       {title && (
-        <div className="flex items-center justify-between border-b border-neon-cyan/30 pb-1.5 mb-0.5 relative z-10">
+        <div className="flex items-center justify-between border-b border-neon-cyan/30 pb-1 mb-0.5 relative z-10">
           <div className="flex flex-col">
-            <span className="text-[9px] font-display font-black uppercase tracking-[0.15em] text-neon-cyan/90">
+            <span className="text-[8px] font-display font-black uppercase tracking-[0.15em] text-neon-cyan/90">
               {title}
             </span>
-            <span className="text-[6px] font-mono text-neon-cyan/40 mt-0.5">
+            <span className="text-[5px] font-mono text-neon-cyan/40 mt-0.5">
               SECURE_CHANNEL_V4.20
             </span>
           </div>
-          {status && (
-            <div className="flex items-center gap-1.5 bg-void/40 px-1.5 py-0.5 border border-neon-cyan/10">
-              <div className={cn(
-                "w-1 h-1 rounded-full flicker-anim",
-                status === 'active' ? "bg-neon-green shadow-[0_0_12px_var(--theme-green)]" : 
-                status === 'warning' ? "bg-neon-pink shadow-[0_0_12px_var(--theme-pink)]" : "bg-gray-700"
-              )} />
-              <span className="text-[8px] font-mono uppercase tracking-widest text-white/60">{status}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {status && (
+              <div className="flex items-center gap-1.5 bg-void/40 px-1.5 py-0.5 border border-neon-cyan/10">
+                <div className={cn(
+                  "w-1 h-1 rounded-full flicker-anim",
+                  status === 'active' ? "bg-neon-green shadow-[0_0_12px_var(--theme-green)]" : 
+                  status === 'warning' ? "bg-neon-pink shadow-[0_0_12px_var(--theme-pink)]" : "bg-gray-700"
+                )} />
+                <span className="text-[8px] font-mono uppercase tracking-widest text-white/60">{status}</span>
+              </div>
+            )}
+            {onClose && (
+              <button 
+                onClick={onClose}
+                className="p-1 hover:bg-neon-cyan/20 text-neon-cyan/40 hover:text-neon-cyan transition-all border border-transparent hover:border-neon-cyan/30"
+              >
+                <div className="w-2 h-2 border-t border-l border-current rotate-45 translate-x-0.5 translate-y-0.5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
       
@@ -69,6 +80,15 @@ export const CodecPanel: React.FC<CodecPanelProps> = ({ children, className, tit
       <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-neon-cyan/60" />
       <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-neon-cyan/60" />
       <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-neon-cyan/60" />
+      
+      {/* Anime HUD Details */}
+      <div className="absolute top-1 left-6 text-[6px] font-mono text-neon-cyan/20 select-none pointer-events-none">
+        COORD_X: {Math.floor(Math.random() * 1000)} / Y: {Math.floor(Math.random() * 1000)}
+      </div>
+      <div className="absolute bottom-1 left-1 flex flex-col gap-0.5 opacity-20">
+        <div className="w-8 h-[1px] bg-neon-cyan" />
+        <div className="w-4 h-[1px] bg-neon-cyan" />
+      </div>
       
       {/* Micro-details */}
       <div className="absolute bottom-1 right-10 opacity-20 pointer-events-none">

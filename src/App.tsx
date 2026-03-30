@@ -55,8 +55,34 @@ import { HermesImportModal } from './components/HermesImportModal';
 import { MusicPlayer } from './components/MusicPlayer';
 import { GlitchText } from './components/GlitchText';
 import { NeuralPulse } from './components/NeuralPulse';
+import { VaporwaveAnimeOverlay } from './components/VaporwaveAnimeOverlay';
+import { WireframeGlobe } from './components/WireframeGlobe';
+import { SystemWarning } from './components/SystemWarning';
 import { AgentTicker } from './components/AgentTicker';
 import { DitherBackground } from './components/DitherBackground';
+import { MissionControl } from './components/MissionControl';
+import { collaborationService } from './services/CollaborationService';
+
+const SidebarHandle = ({ isVisible, onClick, side }: { isVisible: boolean, onClick: () => void, side: 'left' | 'right' }) => (
+  <button 
+    onClick={onClick}
+    className={cn(
+      "absolute top-1/2 -translate-y-1/2 w-1.5 h-20 bg-neon-cyan/10 border border-neon-cyan/30 hover:bg-neon-cyan/30 transition-all z-50 flex items-center justify-center group",
+      side === 'left' ? "left-0 rounded-r" : "right-0 rounded-l"
+    )}
+  >
+    <div className={cn(
+      "w-0.5 h-8 bg-neon-cyan/40 group-hover:bg-neon-cyan transition-colors",
+      isVisible ? "opacity-100" : "opacity-40"
+    )} />
+    <div className={cn(
+      "absolute bg-void/90 border border-neon-cyan/40 px-2 py-1 text-[8px] font-mono text-neon-cyan uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap pointer-events-none z-[60] backdrop-blur-sm",
+      side === 'left' ? "left-4 translate-x-[-10px] group-hover:translate-x-0" : "right-4 translate-x-[10px] group-hover:translate-x-0"
+    )}>
+      {isVisible ? `[COLLAPSE_${side.toUpperCase()}]` : `[EXPAND_${side.toUpperCase()}]`}
+    </div>
+  </button>
+);
 
 export default function App() {
   const nodes = useLiveQuery(() => db.vault.toArray()) || [];
@@ -68,7 +94,7 @@ export default function App() {
   const [newContent, setNewContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [viewMode, setViewMode] = useState<'graph' | 'city' | 'skills' | 'research' | 'files' | 'commons'>('city');
+  const [viewMode, setViewMode] = useState<'graph' | 'city' | 'skills' | 'research' | 'files' | 'commons' | 'mission-control'>('mission-control');
   const [activeImport, setActiveImport] = useState<'text' | 'file' | 'url' | 'voice' | 'obsidian' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [obsidianHandle, setObsidianHandle] = useState<FileSystemDirectoryHandle | null>(null);
@@ -80,7 +106,14 @@ export default function App() {
   const [isHermesImportOpen, setIsHermesImportOpen] = useState(false);
   const [isArchOpen, setIsArchOpen] = useState(false);
   const [isDistrictManagerOpen, setIsDistrictManagerOpen] = useState(false);
+  const [isSwarmVisible, setIsSwarmVisible] = useState(true);
+  const [isMetricsVisible, setIsMetricsVisible] = useState(true);
   const [isGlitching, setIsGlitching] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [swarmRoomId, setSwarmRoomId] = useState<string | null>(null);
+  const [swarmPresence, setSwarmPresence] = useState(0);
+  const [isSwarmModalOpen, setIsSwarmModalOpen] = useState(false);
+  const [tempRoomId, setTempRoomId] = useState('');
 
   // Global Search State
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
@@ -95,6 +128,26 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const memoryService = useMemo(() => settings ? new MemoryService(settings) : null, [settings]);
+
+  useEffect(() => {
+    collaborationService.connect();
+    collaborationService.setPresenceCallback(setSwarmPresence);
+    return () => collaborationService.disconnect();
+  }, []);
+
+  const joinSwarm = (roomId: string) => {
+    if (!roomId.trim()) return;
+    collaborationService.joinRoom(roomId);
+    setSwarmRoomId(roomId);
+    setIsSwarmModalOpen(false);
+  };
+
+  const leaveSwarm = () => {
+    collaborationService.disconnect();
+    collaborationService.connect(); // Reconnect but don't join room
+    setSwarmRoomId(null);
+    setSwarmPresence(0);
+  };
   const orchestrator = useMemo(() => settings ? new OrchestratorService(settings) : null, [settings]);
 
   // Mobile Detection
@@ -167,9 +220,10 @@ export default function App() {
         setIsSettingsOpen(true);
       }
 
-      // Alt + 1-6 for View Modes
+      // Alt + 0-6 for View Modes
       if (e.altKey && !isInput) {
         switch (e.key) {
+          case '0': e.preventDefault(); setViewMode('mission-control'); break;
           case '1': e.preventDefault(); setViewMode('graph'); break;
           case '2': e.preventDefault(); setViewMode('city'); break;
           case '3': e.preventDefault(); setViewMode('skills'); break;
@@ -226,7 +280,7 @@ export default function App() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [globalSearchQuery]);
+  }, [globalSearchQuery, viewMode]);
 
   const consolidateMemories = async () => {
     if (!memoryService) return;
@@ -261,6 +315,9 @@ export default function App() {
     try {
       for (const node of pruneConfirm.nodes) {
         await db.vault.delete(node.id);
+        if (swarmRoomId) {
+          collaborationService.broadcastMemoryDeleted(node.id);
+        }
       }
       setPruneConfirm(null);
     } catch (err) {
@@ -367,6 +424,11 @@ export default function App() {
     return () => clearInterval(interval);
   }, [nodes.length]);
 
+  const handleImportSelect = (type: 'text' | 'file' | 'url' | 'voice' | 'obsidian') => {
+    setActiveImport(type);
+    setImportError(null);
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     if (activeImport === 'file') {
@@ -421,13 +483,18 @@ export default function App() {
 
     try {
       if (memoryService) {
-        await memoryService.addMemory(newContent, {
+        const node = await memoryService.addMemory(newContent, {
           l0_abstract: newContent.substring(0, 100) + '...',
           heat_score: 1.0,
           tags: tags,
           district: district,
           floor: nodes.filter(n => n.district === district).length + 1
         });
+        
+        // Broadcast to Swarm
+        if (swarmRoomId) {
+          collaborationService.broadcastMemoryAdded(node);
+        }
       }
       setNewContent('');
     } catch (err) {
@@ -438,6 +505,8 @@ export default function App() {
   };
 
   const mountObsidian = async () => {
+    setActiveImport('obsidian');
+    setImportError(null);
     try {
       // @ts-ignore - File System Access API
       const handle = await window.showDirectoryPicker();
@@ -445,8 +514,13 @@ export default function App() {
       setIsProcessing(true);
       await syncObsidian(handle);
       setActiveImport(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to mount Obsidian vault:', err);
+      if (err.name === 'SecurityError' || err.message.includes('Cross origin sub frames')) {
+        setImportError("SECURITY_RESTRICTION: File System Access is blocked in the preview iframe. Please open the application in a new tab to link your Obsidian vault.");
+      } else if (err.name !== 'AbortError') {
+        setImportError(`MOUNT_FAILED: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -560,6 +634,9 @@ export default function App() {
     <div className="h-screen w-screen flex flex-col bg-void overflow-hidden relative">
       <DitherBackground />
       <NeuralPulse />
+      <VaporwaveAnimeOverlay />
+      <WireframeGlobe />
+      <SystemWarning isOpen={isConsolidating} message="ORCHESTRATING_SWARM" />
       <div className="grid-bg" />
       <div className="crt-overlay" />
       
@@ -635,68 +712,114 @@ export default function App() {
                       </div>
                     ) : (
                       <>
-                        {globalSearchResults.nodes.length > 0 && (
-                          <div className="space-y-1">
-                            <div className="px-2 py-1 text-[7px] font-black text-neon-cyan uppercase tracking-[0.3em] border-b border-neon-cyan/10 mb-1">Memory_Nodes</div>
-                            {globalSearchResults.nodes.map(node => (
-                              <button
-                                key={node.id}
-                                onClick={() => {
-                                  setViewMode('city');
-                                  setGlobalSearchQuery('');
-                                }}
-                                className="w-full text-left p-2 hover:bg-neon-cyan/5 border border-transparent hover:border-neon-cyan/20 transition-all group"
-                              >
-                                <div className="text-[10px] font-display font-black text-white group-hover:text-neon-cyan truncate">{node.memori_uri}</div>
-                                <div className="text-[8px] font-mono text-white/40 truncate">{node.summary || node.l0_abstract}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {globalSearchResults.files.length > 0 && (
-                          <div className="space-y-1">
-                            <div className="px-2 py-1 text-[7px] font-black text-neon-blue uppercase tracking-[0.3em] border-b border-neon-blue/10 mb-1">File_System</div>
-                            {globalSearchResults.files.map(file => (
-                              <button
-                                key={file.id}
-                                onClick={() => {
-                                  setViewMode('files');
-                                  setGlobalSearchQuery('');
-                                }}
-                                className="w-full text-left p-2 hover:bg-neon-blue/5 border border-transparent hover:border-neon-blue/20 transition-all group"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <FolderOpen size={10} className="text-neon-blue" />
-                                  <div className="text-[10px] font-display font-black text-white group-hover:text-neon-blue truncate">{file.name}</div>
+                        {[
+                          { 
+                            id: 'nodes', 
+                            render: () => (
+                              globalSearchResults.nodes.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="px-2 py-1 text-[7px] font-black text-neon-cyan uppercase tracking-[0.3em] border-b border-neon-cyan/10 mb-1 flex justify-between items-center">
+                                    <span>Memory_Nodes</span>
+                                    {(viewMode === 'city' || viewMode === 'graph' || viewMode === 'commons' || viewMode === 'research') && (
+                                      <span className="text-[6px] text-neon-cyan/40">[PRIORITY_LINK]</span>
+                                    )}
+                                  </div>
+                                  {globalSearchResults.nodes.map(node => (
+                                    <button
+                                      key={node.id}
+                                      onClick={() => {
+                                        setViewMode('city');
+                                        setGlobalSearchQuery('');
+                                      }}
+                                      className="w-full text-left p-2 hover:bg-neon-cyan/5 border border-transparent hover:border-neon-cyan/20 transition-all group"
+                                    >
+                                      <div className="text-[10px] font-display font-black text-white group-hover:text-neon-cyan truncate">{node.memori_uri}</div>
+                                      <div className="text-[8px] font-mono text-white/40 truncate">{node.summary || node.l0_abstract}</div>
+                                    </button>
+                                  ))}
                                 </div>
-                                <div className="text-[8px] font-mono text-white/40 truncate ml-4">{file.parentId === 'root' ? '/' : '.../'}{file.name}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {globalSearchResults.skills.length > 0 && (
-                          <div className="space-y-1">
-                            <div className="px-2 py-1 text-[7px] font-black text-neon-purple uppercase tracking-[0.3em] border-b border-neon-purple/10 mb-1">Skill_Forge</div>
-                            {globalSearchResults.skills.map(skill => (
-                              <button
-                                key={skill.id}
-                                onClick={() => {
-                                  setViewMode('skills');
-                                  setGlobalSearchQuery('');
-                                }}
-                                className="w-full text-left p-2 hover:bg-neon-purple/5 border border-transparent hover:border-neon-purple/20 transition-all group"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Zap size={10} className="text-neon-purple" />
-                                  <div className="text-[10px] font-display font-black text-white group-hover:text-neon-purple truncate">{skill.name}</div>
+                              )
+                            )
+                          },
+                          { 
+                            id: 'files', 
+                            render: () => (
+                              globalSearchResults.files.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="px-2 py-1 text-[7px] font-black text-neon-blue uppercase tracking-[0.3em] border-b border-neon-blue/10 mb-1 flex justify-between items-center">
+                                    <span>File_System</span>
+                                    {viewMode === 'files' && (
+                                      <span className="text-[6px] text-neon-blue/40">[PRIORITY_LINK]</span>
+                                    )}
+                                  </div>
+                                  {globalSearchResults.files.map(file => (
+                                    <button
+                                      key={file.id}
+                                      onClick={() => {
+                                        setViewMode('files');
+                                        setGlobalSearchQuery('');
+                                      }}
+                                      className="w-full text-left p-2 hover:bg-neon-blue/5 border border-transparent hover:border-neon-blue/20 transition-all group"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <FolderOpen size={10} className="text-neon-blue" />
+                                        <div className="text-[10px] font-display font-black text-white group-hover:text-neon-blue truncate">{file.name}</div>
+                                      </div>
+                                      <div className="text-[8px] font-mono text-white/40 truncate ml-4">{file.parentId === 'root' ? '/' : '.../'}{file.name}</div>
+                                    </button>
+                                  ))}
                                 </div>
-                                <div className="text-[8px] font-mono text-white/40 truncate ml-4">{skill.description}</div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                              )
+                            )
+                          },
+                          { 
+                            id: 'skills', 
+                            render: () => (
+                              globalSearchResults.skills.length > 0 && (
+                                <div className="space-y-1">
+                                  <div className="px-2 py-1 text-[7px] font-black text-neon-purple uppercase tracking-[0.3em] border-b border-neon-purple/10 mb-1 flex justify-between items-center">
+                                    <span>Skill_Forge</span>
+                                    {viewMode === 'skills' && (
+                                      <span className="text-[6px] text-neon-purple/40">[PRIORITY_LINK]</span>
+                                    )}
+                                  </div>
+                                  {globalSearchResults.skills.map(skill => (
+                                    <button
+                                      key={skill.id}
+                                      onClick={() => {
+                                        setViewMode('skills');
+                                        setGlobalSearchQuery('');
+                                      }}
+                                      className="w-full text-left p-2 hover:bg-neon-purple/5 border border-transparent hover:border-neon-purple/20 transition-all group"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <Zap size={10} className="text-neon-purple" />
+                                        <div className="text-[10px] font-display font-black text-white group-hover:text-neon-purple truncate">{skill.name}</div>
+                                      </div>
+                                      <div className="text-[8px] font-mono text-white/40 truncate ml-4">{skill.description}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )
+                            )
+                          }
+                        ].sort((a, b) => {
+                          if (viewMode === 'files') {
+                            if (a.id === 'files') return -1;
+                            if (b.id === 'files') return 1;
+                          } else if (viewMode === 'skills') {
+                            if (a.id === 'skills') return -1;
+                            if (b.id === 'skills') return 1;
+                          } else {
+                            if (a.id === 'nodes') return -1;
+                            if (b.id === 'nodes') return 1;
+                          }
+                          return 0;
+                        }).map(section => (
+                          <React.Fragment key={section.id}>
+                            {section.render()}
+                          </React.Fragment>
+                        ))}
                       </>
                     )}
                   </div>
@@ -719,6 +842,15 @@ export default function App() {
         
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-void border border-neon-cyan/30 p-0.5 rounded-none gap-0.5">
+            <button 
+              onClick={() => setViewMode('mission-control')}
+              className={cn(
+                "px-2.5 py-1 transition-all text-[9px] font-mono uppercase tracking-widest",
+                viewMode === 'mission-control' ? "bg-neon-cyan text-void font-bold" : "text-neon-cyan hover:bg-neon-cyan/10"
+              )}
+            >
+              MISSION
+            </button>
             <button 
               onClick={() => setViewMode('graph')}
               className={cn(
@@ -781,14 +913,35 @@ export default function App() {
             </button>
           </div>
           <button 
-            onClick={() => setSidebarVisible(!sidebarVisible)}
+            onClick={() => setIsSwarmModalOpen(true)}
             className={cn(
-              "p-1.5 border transition-all",
-              sidebarVisible ? "border-neon-cyan/50 text-neon-cyan bg-neon-cyan/10" : "border-white/10 text-white/40 hover:text-white hover:border-white"
+              "p-1.5 border transition-all flex items-center gap-2",
+              swarmRoomId ? "border-neon-green/50 text-neon-green bg-neon-green/10" : "border-white/10 text-white/40 hover:text-white hover:border-white"
             )}
-            title="Toggle Sidebars"
+            title="Swarm Collaboration"
           >
-            <Layers size={16} />
+            <Network size={16} />
+            {swarmPresence > 0 && <span className="text-[9px] font-mono">{swarmPresence}</span>}
+          </button>
+          <button 
+            onClick={() => setIsSwarmVisible(!isSwarmVisible)}
+            className={cn(
+              "p-1.5 border transition-all flex items-center gap-2",
+              isSwarmVisible ? "border-neon-pink/50 text-neon-pink bg-neon-pink/10" : "border-white/10 text-white/40 hover:text-white hover:border-white"
+            )}
+            title="Toggle Agent Swarm"
+          >
+            <Cpu size={16} />
+          </button>
+          <button 
+            onClick={() => setIsMetricsVisible(!isMetricsVisible)}
+            className={cn(
+              "p-1.5 border transition-all flex items-center gap-2",
+              isMetricsVisible ? "border-neon-cyan/50 text-neon-cyan bg-neon-cyan/10" : "border-white/10 text-white/40 hover:text-white hover:border-white"
+            )}
+            title="Toggle System Metrics"
+          >
+            <Activity size={16} />
           </button>
           <button 
             onClick={() => setIsSettingsOpen(true)}
@@ -799,155 +952,204 @@ export default function App() {
         </div>
       </header>
       
-      {/* Agent Activity Ticker */}
-      <AgentTicker />
-
+      {/* Agent Activity Ticker Removed */}
+      
       {/* Main Content */}
-      <main className={cn("flex-1 flex p-3 overflow-hidden relative z-10", sidebarVisible ? "gap-3" : "gap-0")}>
+      <main className={cn("flex-1 flex p-2 overflow-hidden relative z-10", (isSwarmVisible || isMetricsVisible) ? "gap-2" : "gap-0")}>
+        {/* Left Sidebar Handle */}
+        <SidebarHandle 
+          side="left" 
+          isVisible={isSwarmVisible || isMetricsVisible} 
+          onClick={() => {
+            const target = !(isSwarmVisible || isMetricsVisible);
+            setIsSwarmVisible(target);
+            setIsMetricsVisible(target);
+          }} 
+        />
+
         {/* Left Sidebar: Agents & Stats */}
         <div className={cn(
-          "flex flex-col gap-3 transition-all duration-500 min-h-0 overflow-hidden",
-          !sidebarVisible ? "w-0 opacity-0" : viewMode === 'city' ? "w-48 opacity-100" : "w-80 opacity-100"
+          "flex flex-col gap-2 transition-all duration-500 min-h-0",
+          (!isSwarmVisible && !isMetricsVisible) ? "w-0" : viewMode === 'city' ? "w-48" : "w-72"
         )}>
-          <CodecPanel title="AGENT_SWARM_HUD" status="active" className="h-1/2 min-h-0">
-            <div className="flex flex-col gap-4 overflow-y-auto custom-scrollbar h-full pr-2">
-              {agents.length === 0 ? (
-                <div className="text-[9px] font-mono text-gray-600 italic">No agents registered.</div>
-              ) : (
-                agents.map(agent => (
-                  <div key={agent.id} className="p-3 border border-neon-cyan/10 bg-void/60 relative group hover:border-neon-cyan/40 transition-all">
-                    <div className="absolute top-0 right-0 w-1 h-full bg-neon-cyan/20 group-hover:bg-neon-cyan transition-colors" />
+          <AnimatePresence mode="popLayout">
+            {isSwarmVisible && (
+              <motion.div
+                key="swarm-hud"
+                initial={{ x: -400, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -400, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 120 }}
+                className={cn("min-h-0", isMetricsVisible ? "h-1/2" : "flex-1")}
+              >
+                <CodecPanel 
+                  title="AGENT_SWARM_HUD" 
+                  status="active" 
+                  className="h-full"
+                  onClose={() => setIsSwarmVisible(false)}
+                >
+                  <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar h-full pr-1">
+                    {agents.length === 0 ? (
+                      <div className="text-[9px] font-mono text-gray-600 italic">No agents registered.</div>
+                    ) : (
+                      agents.map(agent => (
+                        <div key={agent.id} className="p-2 border border-neon-cyan/10 bg-void/60 relative group hover:border-neon-cyan/40 transition-all">
+                          <div className="absolute top-0 right-0 w-1 h-full bg-neon-cyan/20 group-hover:bg-neon-cyan transition-colors" />
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <Cpu size={10} className={cn(agent.status === 'running' ? "text-neon-green" : "text-white/20")} />
+                              <span className="text-[9px] font-display font-black text-neon-cyan uppercase tracking-wider truncate">{agent.agent_type}</span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <div className={cn("w-1 h-1 rounded-full", agent.status === 'running' ? "bg-neon-green flicker-anim" : "bg-white/20")} />
+                              <span className={cn("text-[6px] font-mono uppercase", agent.status === 'running' ? "text-neon-green/60" : "text-white/20")}>
+                                {agent.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-[8px] text-white/60 font-mono leading-tight bg-void/40 p-1.5 border-l border-neon-cyan/20 mb-2 italic max-h-10 overflow-y-auto custom-scrollbar">
+                            {agent.current_task || 'IDLE_WAITING_FOR_TASK'}
+                          </div>
+                          
+                          {/* Interactive Controls */}
+                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setSkillManagerAgent(agent);
+                              }}
+                              className="flex-1 py-0.5 bg-neon-cyan/10 border border-neon-cyan/30 text-[6px] font-mono text-neon-cyan uppercase hover:bg-neon-cyan hover:text-void transition-all"
+                            >
+                              Skills
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                const newStatus = agent.status === 'running' ? 'sleeping' : 'running';
+                                await db.agents.update(agent.id, { status: newStatus });
+                              }}
+                              className="flex-1 py-0.5 bg-neon-purple/10 border border-neon-purple/30 text-[6px] font-mono text-neon-purple uppercase hover:bg-neon-purple hover:text-white transition-all"
+                            >
+                              {agent.status === 'running' ? 'Sleep' : 'Wake'}
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                if (confirm(`Terminate agent ${agent.agent_id}?`)) {
+                                  await db.agents.delete(agent.id);
+                                }
+                              }}
+                              className="px-1.5 py-0.5 bg-neon-pink/10 border border-neon-pink/30 text-[6px] font-mono text-neon-pink uppercase hover:bg-neon-pink hover:text-white transition-all"
+                            >
+                              Kill
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+              </CodecPanel>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="popLayout">
+          {isMetricsVisible && (
+            <motion.div
+              key="metrics-hud"
+              initial={{ x: -400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -400, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 120 }}
+              className="flex-1 min-h-0"
+            >
+              <CodecPanel 
+                title="SYSTEM_CORE_METRICS" 
+                className="h-full"
+                onClose={() => setIsMetricsVisible(false)}
+              >
+                <div className="space-y-4">
+                  {/* District Legend */}
+                  <div className="bg-void/40 p-2 border border-neon-cyan/10">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Cpu size={12} className={cn(agent.status === 'running' ? "text-neon-green" : "text-white/20")} />
-                        <span className="text-[10px] font-display font-black text-neon-cyan uppercase tracking-wider">{agent.agent_type}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className={cn("w-1 h-1 rounded-full", agent.status === 'running' ? "bg-neon-green flicker-anim" : "bg-white/20")} />
-                        <span className={cn("text-[7px] font-mono uppercase", agent.status === 'running' ? "text-neon-green/60" : "text-white/20")}>
-                          {agent.status}
-                        </span>
-                      </div>
+                      <div className="text-[8px] font-mono text-neon-cyan/60 uppercase tracking-[0.2em]">District_Index</div>
+                      <button 
+                        onClick={pruneMemories}
+                        className="text-[7px] font-mono text-neon-pink hover:text-white transition-colors uppercase"
+                      >
+                        [Run_Garbage_Collector]
+                      </button>
                     </div>
-                    <div className="text-[9px] text-white/60 font-mono leading-tight bg-void/40 p-2 border-l border-neon-cyan/20 mb-3 italic">
-                      {agent.current_task || 'IDLE_WAITING_FOR_TASK'}
-                    </div>
-                    
-                    {/* Interactive Controls */}
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => {
-                          setSkillManagerAgent(agent);
-                        }}
-                        className="flex-1 py-1 bg-neon-cyan/10 border border-neon-cyan/30 text-[7px] font-mono text-neon-cyan uppercase hover:bg-neon-cyan hover:text-void transition-all"
-                      >
-                        Skills
-                      </button>
-                      <button 
-                        onClick={async () => {
-                          const newStatus = agent.status === 'running' ? 'sleeping' : 'running';
-                          await db.agents.update(agent.id, { status: newStatus });
-                        }}
-                        className="flex-1 py-1 bg-neon-purple/10 border border-neon-purple/30 text-[7px] font-mono text-neon-purple uppercase hover:bg-neon-purple hover:text-white transition-all"
-                      >
-                        {agent.status === 'running' ? 'Sleep' : 'Wake'}
-                      </button>
-                      <button 
-                        onClick={async () => {
-                          if (confirm(`Terminate agent ${agent.agent_id}?`)) {
-                            await db.agents.delete(agent.id);
-                          }
-                        }}
-                        className="px-2 py-1 bg-neon-pink/10 border border-neon-pink/30 text-[7px] font-mono text-neon-pink uppercase hover:bg-neon-pink hover:text-white transition-all"
-                      >
-                        Kill
-                      </button>
+                    <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
+                      {Array.from(new Set(nodes.map(n => n.district))).map(district => {
+                        const districtStr = (district as string) || 'UNCATEGORIZED';
+                        const hash = districtStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                        const colors = ['var(--theme-pink)', 'var(--theme-cyan)', 'var(--theme-green)', 'var(--theme-purple)', 'var(--theme-yellow)'];
+                        const color = colors[hash % colors.length];
+                        return (
+                          <div key={districtStr} className="flex items-center gap-1.5 text-[8px] font-mono">
+                            <div className="w-1.5 h-1.5" style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
+                            <span className="text-white/60 uppercase truncate">{districtStr}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </CodecPanel>
 
-          <CodecPanel title="SYSTEM_CORE_METRICS" className="flex-1">
-            <div className="space-y-4">
-              {/* District Legend */}
-              <div className="bg-void/40 p-2 border border-neon-cyan/10">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-[8px] font-mono text-neon-cyan/60 uppercase tracking-[0.2em]">District_Index</div>
-                  <button 
-                    onClick={pruneMemories}
-                    className="text-[7px] font-mono text-neon-pink hover:text-white transition-colors uppercase"
-                  >
-                    [Run_Garbage_Collector]
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
-                  {Array.from(new Set(nodes.map(n => n.district))).map(district => {
-                    const districtStr = (district as string) || 'UNCATEGORIZED';
-                    const hash = districtStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                    const colors = ['var(--theme-pink)', 'var(--theme-cyan)', 'var(--theme-green)', 'var(--theme-purple)', 'var(--theme-yellow)'];
-                    const color = colors[hash % colors.length];
-                    return (
-                      <div key={districtStr} className="flex items-center gap-1.5 text-[8px] font-mono">
-                        <div className="w-1.5 h-1.5" style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
-                        <span className="text-white/60 uppercase truncate">{districtStr}</span>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-[9px] font-mono mb-1.5">
+                        <span className="text-white/40 uppercase tracking-widest">Memory_Pressure</span>
+                        <span className="text-neon-pink neon-glow-pink">42.0%</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-[9px] font-mono mb-1.5">
-                    <span className="text-white/40 uppercase tracking-widest">Memory_Pressure</span>
-                    <span className="text-neon-pink neon-glow-pink">42.0%</span>
-                  </div>
-                  <div className="h-1 bg-void border border-neon-pink/20 overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: '42%' }}
-                      className="h-full bg-neon-pink shadow-[0_0_10px_var(--theme-pink)]"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[9px] font-mono mb-1.5">
-                    <span className="text-white/40 uppercase tracking-widest">RRL_Cycle_Load</span>
-                    <span className="text-neon-cyan neon-glow-cyan">70.4%</span>
-                  </div>
-                  <div className="h-1 bg-void border border-neon-cyan/20 overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: '70%' }}
-                      className="h-full bg-neon-cyan shadow-[0_0_10px_var(--theme-cyan)]"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="pt-3 border-t border-neon-cyan/10">
-                <div className="text-[8px] font-mono text-neon-purple uppercase mb-2 tracking-[0.2em]">Breach_Log</div>
-                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
-                  {agents.map(agent => (
-                    <div key={agent.id} className="text-[8px] font-mono text-white/40 flex items-start gap-2 group">
-                      <span className="text-neon-cyan/40 group-hover:text-neon-cyan transition-colors">[{new Date(agent.last_heartbeat).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}]</span>
-                      <span className="group-hover:text-white transition-colors truncate">{agent.agent_id.toUpperCase()}: {agent.current_task}</span>
+                      <div className="h-1 bg-void border border-neon-pink/20 overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: '42%' }}
+                          className="h-full bg-neon-pink shadow-[0_0_10px_var(--theme-pink)]"
+                        />
+                      </div>
                     </div>
-                  ))}
+                    <div>
+                      <div className="flex justify-between text-[9px] font-mono mb-1.5">
+                        <span className="text-white/40 uppercase tracking-widest">RRL_Cycle_Load</span>
+                        <span className="text-neon-cyan neon-glow-cyan">70.4%</span>
+                      </div>
+                      <div className="h-1 bg-void border border-neon-cyan/20 overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: '70%' }}
+                          className="h-full bg-neon-cyan shadow-[0_0_10px_var(--theme-cyan)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-3 border-t border-neon-cyan/10">
+                    <div className="text-[8px] font-mono text-neon-purple uppercase mb-2 tracking-[0.2em]">Breach_Log</div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                      {agents.map(agent => (
+                        <div key={agent.id} className="text-[8px] font-mono text-white/40 flex items-start gap-2 group">
+                          <span className="text-neon-cyan/40 group-hover:text-neon-cyan transition-colors">[{new Date(agent.last_heartbeat).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}]</span>
+                          <span className="group-hover:text-white transition-colors truncate">{agent.agent_id.toUpperCase()}: {agent.current_task}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </CodecPanel>
-        </div>
+              </CodecPanel>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
         {/* Center: Memory Visualization */}
         <div className={cn(
-          "flex flex-col gap-3 transition-all duration-500 min-h-0 min-w-0",
+          "flex flex-col gap-2 transition-all duration-500 min-h-0 min-w-0",
           viewMode === 'city' ? "flex-[15]" : "flex-1"
         )}>
-          {viewMode === 'skills' ? (
+          {viewMode === 'mission-control' ? (
+            <CodecPanel title="MISSION_CONTROL_DASHBOARD" className="flex-1 !p-0 overflow-hidden battle-border min-h-0">
+              <MissionControl setViewMode={setViewMode} />
+            </CodecPanel>
+          ) : viewMode === 'skills' ? (
             <CodecPanel title="SKILL_FORGE_CORE" className="flex-1 !p-0 overflow-hidden battle-border min-h-0">
               <SkillForge />
             </CodecPanel>
@@ -974,7 +1176,7 @@ export default function App() {
               </CodecPanel>
               
               {/* Multi-Modal Import Docks */}
-              <div className="grid grid-cols-6 gap-3 h-36">
+              <div className="grid grid-cols-6 gap-2 h-40">
                 <CodecPanel title="IMPORT_DOCK_ARRAY" className="col-span-4">
                   <AnimatePresence mode="wait">
                     {!activeImport ? (
@@ -982,7 +1184,7 @@ export default function App() {
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 1.02 }}
-                        className="grid grid-cols-4 gap-3 h-full"
+                        className="grid grid-cols-4 gap-2 h-full"
                       >
                         <ImportDock 
                           icon={FolderOpen} 
@@ -995,14 +1197,14 @@ export default function App() {
                           icon={HardDrive} 
                           label="LOCAL_FS" 
                           description="SYNC_DRIVE // ローカル" 
-                          onClick={() => setActiveImport('file')} 
+                          onClick={() => handleImportSelect('file')} 
                           color="var(--theme-green)"
                         />
                         <ImportDock 
                           icon={Globe} 
                           label="CLOUD" 
                           description="SYNC_GDRIVE // クラウド" 
-                          onClick={() => setActiveImport('url')} 
+                          onClick={() => handleImportSelect('url')} 
                           color="var(--theme-cyan)"
                         />
                         <ImportDock 
@@ -1016,14 +1218,14 @@ export default function App() {
                           icon={Plus} 
                           label="QUICK_NOTE" 
                           description="NEW_MEMORY // メモ" 
-                          onClick={() => setActiveImport('text')} 
+                          onClick={() => handleImportSelect('text')} 
                           color="var(--theme-green)"
                         />
                         <ImportDock 
                           icon={Mic} 
                           label="NEURAL_LINK" 
                           description="VOICE_STREAM // 音声" 
-                          onClick={() => setActiveImport('voice')} 
+                          onClick={() => handleImportSelect('voice')} 
                           color="var(--theme-cyan)"
                         />
                         <ImportDock 
@@ -1124,6 +1326,12 @@ export default function App() {
                                   ? `Currently linked to: ${obsidianHandle.name}. Synchronize to update the Memori-City grid with the latest markdown nodes.`
                                   : "Establish a neural link with your local Obsidian vault. All markdown nodes will be indexed into the Memori-City grid."}
                               </p>
+                              
+                              {importError && (
+                                <div className="mt-4 p-3 border border-neon-pink/40 bg-neon-pink/5 text-neon-pink font-mono text-[9px] uppercase tracking-widest leading-relaxed">
+                                  {importError}
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex flex-col gap-3 w-full max-w-[240px]">
@@ -1404,10 +1612,24 @@ export default function App() {
 
         {/* Right Sidebar: Node Inspector */}
         <div className={cn(
-          "flex flex-col gap-3 transition-all duration-500 min-h-0 overflow-hidden",
-          !sidebarVisible ? "w-0 opacity-0" : viewMode === 'city' ? "w-48 opacity-100" : "w-80 opacity-100"
+          "flex flex-col gap-3 transition-all duration-500 min-h-0",
+          !sidebarVisible ? "w-0" : viewMode === 'city' ? "w-48" : "w-80"
         )}>
-          <CodecPanel title="COGNITIVE_RECALL_BUFFER" className="h-64 min-h-0">
+          <AnimatePresence mode="popLayout">
+            {sidebarVisible && (
+              <motion.div
+                key="right-sidebar"
+                initial={{ x: 400, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 400, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 120 }}
+                className="flex flex-col gap-3 h-full"
+              >
+          <CodecPanel 
+            title="COGNITIVE_RECALL_BUFFER" 
+            className="h-64 min-h-0"
+            onClose={() => setSidebarVisible(false)}
+          >
             <div className="flex flex-col h-full gap-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1452,7 +1674,11 @@ export default function App() {
             </div>
           </CodecPanel>
 
-          <CodecPanel title="NODE_INSPECTOR_HUD" className="flex-1 min-h-0">
+          <CodecPanel 
+            title="NODE_INSPECTOR_HUD" 
+            className="flex-1 min-h-0"
+            onClose={() => setSidebarVisible(false)}
+          >
             {nodes.length > 0 ? (
               <div className="space-y-6">
                 <div className="p-4 border border-neon-pink/20 bg-void/60 relative group">
@@ -1540,7 +1766,17 @@ export default function App() {
               </div>
             )}
           </CodecPanel>
-        </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+
+        {/* Right Sidebar Handle */}
+        <SidebarHandle 
+          side="right" 
+          isVisible={sidebarVisible} 
+          onClick={() => setSidebarVisible(!sidebarVisible)} 
+        />
       </main>
 
       {/* Prune Confirmation Modal */}
@@ -1588,6 +1824,88 @@ export default function App() {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      {/* Swarm Collaboration Modal */}
+      <AnimatePresence>
+        {isSwarmModalOpen && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSwarmModalOpen(false)}
+              className="absolute inset-0 bg-void/90 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-black border border-neon-cyan/30 p-8 shadow-[0_0_50px_rgba(0,243,255,0.1)]"
+            >
+              <div className="dither-overlay opacity-5" />
+              
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <Network className="text-neon-cyan" size={24} />
+                  <h2 className="text-xl font-display font-black text-neon-cyan uppercase tracking-[0.3em]">Swarm_Link</h2>
+                </div>
+                <button 
+                  onClick={() => setIsSwarmModalOpen(false)}
+                  className="text-white/40 hover:text-white transition-colors"
+                >
+                  <Plus className="rotate-45" size={20} />
+                </button>
+              </div>
+
+              {swarmRoomId ? (
+                <div className="space-y-6">
+                  <div className="p-4 border border-neon-green/20 bg-neon-green/5">
+                    <div className="text-[10px] font-mono text-neon-green/60 uppercase mb-1">Active_Swarm_Room</div>
+                    <div className="text-lg font-mono text-neon-green uppercase tracking-widest">{swarmRoomId}</div>
+                    <div className="mt-2 flex items-center gap-2 text-[9px] font-mono text-white/40">
+                      <div className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
+                      <span>{swarmPresence} NODES_CONNECTED</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={leaveSwarm}
+                    className="w-full py-3 border border-neon-pink/40 text-neon-pink font-display font-black uppercase tracking-[0.2em] hover:bg-neon-pink hover:text-white transition-all"
+                  >
+                    Disconnect_From_Swarm
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <p className="text-[10px] font-mono text-white/40 uppercase leading-relaxed">
+                    Establish a real-time neural link with other kernels. Build a shared memory base for collaboration or business intelligence.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-mono text-neon-cyan/60 uppercase tracking-widest">Swarm_Room_ID</label>
+                    <input 
+                      type="text"
+                      value={tempRoomId}
+                      onChange={(e) => setTempRoomId(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && joinSwarm(tempRoomId)}
+                      placeholder="ENTER_SWARM_ID..."
+                      className="w-full bg-void/60 border border-neon-cyan/20 p-3 outline-none text-neon-cyan font-mono text-sm placeholder:text-neon-cyan/20"
+                      autoFocus
+                    />
+                  </div>
+
+                  <button 
+                    onClick={() => joinSwarm(tempRoomId)}
+                    disabled={!tempRoomId.trim()}
+                    className="w-full py-3 bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan font-display font-black uppercase tracking-[0.2em] hover:bg-neon-cyan hover:text-void transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Establish_Link
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Skill Manager Modal */}
       <SkillManagerModal 

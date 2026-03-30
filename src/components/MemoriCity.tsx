@@ -18,6 +18,45 @@ import { useSettings } from '../contexts/SettingsContext';
 
 const getThemeColors = (theme: string = 'cyberpunk') => {
   switch (theme) {
+    case 'retro-futurism':
+      return {
+        cyan: '#00A896',
+        pink: '#FF6B35',
+        green: '#F7B733',
+        purple: '#454D66',
+        yellow: '#EFE9D5',
+        void: '#2D3047',
+        fogDay: '#454D66',
+        fogNight: '#2D3047',
+        fogAlert: '#550000',
+        fogLoad: '#331100'
+      };
+    case 'organic-growth':
+      return {
+        cyan: '#A3B18A',
+        pink: '#D4A373',
+        green: '#588157',
+        purple: '#3A5A40',
+        yellow: '#DAD7CD',
+        void: '#1B1F17',
+        fogDay: '#3A5A40',
+        fogNight: '#1B1F17',
+        fogAlert: '#331111',
+        fogLoad: '#222222'
+      };
+    case 'deep-sea':
+      return {
+        cyan: '#4CC9F0',
+        pink: '#480CA8',
+        green: '#4361EE',
+        purple: '#3F37C9',
+        yellow: '#B5E48C',
+        void: '#03045E',
+        fogDay: '#023E8A',
+        fogNight: '#03045E',
+        fogAlert: '#000033',
+        fogLoad: '#001122'
+      };
     case 'scifi':
       return {
         cyan: '#00E5FF',
@@ -62,7 +101,7 @@ const getThemeColors = (theme: string = 'cyberpunk') => {
 };
 
 // --- Dynamic Environment ---
-const DynamicEnvironment = ({ status, hour, fogDensity, starCount, themeColors }: { status: string, hour: number, fogDensity: number, starCount: number, themeColors: any }) => {
+const DynamicEnvironment = ({ status, hour, fogDensity, starCount, themeColors, theme }: { status: string, hour: number, fogDensity: number, starCount: number, themeColors: any, theme: string }) => {
   const timeProgress = hour / 24;
   const angle = (timeProgress - 0.25) * Math.PI * 2;
   
@@ -77,6 +116,21 @@ const DynamicEnvironment = ({ status, hour, fogDensity, starCount, themeColors }
   
   let effectiveStarCount = starCount;
   let effectiveFogDensity = fogDensity;
+
+  if (theme === 'deep-sea') {
+    effectiveStarCount = 0;
+    effectiveFogDensity = fogDensity * 0.2;
+    turbidity = 50;
+    rayleigh = 10;
+    mieCoefficient = 0.1;
+  } else if (theme === 'organic-growth') {
+    effectiveStarCount = starCount * 0.3;
+    turbidity = 5;
+    rayleigh = 2;
+  } else if (theme === 'retro-futurism') {
+    turbidity = 10;
+    rayleigh = 4;
+  }
 
   if (status === 'alert') {
     fogColor = themeColors.fogAlert;
@@ -465,6 +519,7 @@ export const MemoriCity: React.FC<{ nodes: MemoriNode[], agents: AgentRecord[] }
           fogDensity={fogDensity} 
           starCount={starCount} 
           themeColors={themeColors}
+          theme={settings.visualTheme || 'cyberpunk'}
         />
         
         <PerspectiveCamera makeDefault position={[25, 25, 25]} fov={55} />

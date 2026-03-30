@@ -41,6 +41,14 @@ export interface MemoriNode {
   is_public?: boolean;
 }
 
+export interface TaskDetail {
+  id: string;
+  label: string;
+  priority: 'low' | 'medium' | 'high';
+  parameters?: Record<string, any>;
+  started_at: string;
+}
+
 export interface AgentRecord {
   id: string;
   agent_id: string;
@@ -48,6 +56,8 @@ export interface AgentRecord {
   status: 'sleeping' | 'running' | 'dead';
   last_heartbeat: string;
   current_task?: string;
+  task_queue?: string[];
+  current_task_details?: TaskDetail;
   thinking_log?: string[];
   target_building?: string;
   current_pos?: [number, number, number];
@@ -91,13 +101,21 @@ export interface DeepResearchConfig {
   maxIterations: number;
 }
 
+export interface UserProfile {
+  name: string;
+  avatar?: string;
+  bio?: string;
+  rank?: string;
+  joined_at: string;
+}
+
 export interface AppSettings {
   id: 'current';
   isAutoUpdate: boolean;
   fontSize: number;
   lineWrap: boolean;
   theme: 'light' | 'dark' | 'system';
-  visualTheme?: 'cyberpunk' | 'minimalist' | 'scifi';
+  visualTheme?: 'cyberpunk' | 'minimalist' | 'scifi' | 'retro-futurism' | 'organic-growth' | 'deep-sea';
   accentColor: string;
   activePlugins: string[];
   language: string;
@@ -106,6 +124,7 @@ export interface AppSettings {
   encryptionSecret?: string;
   defaultNoteLocation: 'root' | 'current' | 'folder';
   deleteBehavior: 'trash' | 'dot-trash' | 'permanent';
+  profile?: UserProfile;
   subagent_presets?: {
     [key: string]: {
       skills: string[];

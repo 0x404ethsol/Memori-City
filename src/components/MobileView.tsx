@@ -28,8 +28,10 @@ import {
   Download,
   Wifi,
   Battery,
-  Signal
+  Signal,
+  LayoutDashboard
 } from 'lucide-react';
+import { MissionControl } from './MissionControl';
 import { MemoriNode, AgentRecord } from '../types';
 import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -39,7 +41,6 @@ import { GlitchText } from './GlitchText';
 import { haptics } from '../lib/haptics';
 import { QRCodeCanvas } from 'qrcode.react';
 import { NeuralPulse } from './NeuralPulse';
-import { AgentTicker } from './AgentTicker';
 import { DitherBackground } from './DitherBackground';
 
 interface MobileViewProps {
@@ -75,7 +76,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
   onSetGlobalSearchQuery,
   globalSearchResults
 }) => {
-  const [activeTab, setActiveTab] = useState<'memory' | 'agents' | 'import' | 'chat' | 'system'>('memory');
+  const [activeTab, setActiveTab] = useState<'memory' | 'agents' | 'import' | 'chat' | 'system' | 'mission'>('mission');
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -266,14 +267,30 @@ export const MobileView: React.FC<MobileViewProps> = ({
         </div>
       </header>
 
-      {/* Agent Activity Ticker */}
-      <AgentTicker />
-
+      {/* Agent Activity Ticker Removed */}
+      
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-24 relative">
         <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none" />
         
         <AnimatePresence mode="wait">
+          {activeTab === 'mission' && (
+            <motion.div
+              key="mission"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="flex-1 h-full overflow-y-auto"
+            >
+              <MissionControl setViewMode={(mode) => {
+                onSetViewMode(mode);
+                if (mode === 'city' || mode === 'graph') setActiveTab('memory');
+                if (mode === 'skills') setActiveTab('agents');
+                if (mode === 'files') setActiveTab('system');
+              }} />
+            </motion.div>
+          )}
+
           {activeTab === 'memory' && (
             <motion.div
               key="memory"
@@ -726,6 +743,12 @@ export const MobileView: React.FC<MobileViewProps> = ({
       <nav className="h-20 border-t border-neon-cyan/20 bg-void/90 backdrop-blur-xl flex items-center justify-around px-2 z-30 fixed bottom-0 left-0 right-0">
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-neon-cyan/30 to-transparent" />
         
+        <NavButton 
+          active={activeTab === 'mission'} 
+          onClick={() => handleTabChange('mission')} 
+          icon={<LayoutDashboard size={20} />} 
+          label="Mission"
+        />
         <NavButton 
           active={activeTab === 'memory'} 
           onClick={() => handleTabChange('memory')} 
