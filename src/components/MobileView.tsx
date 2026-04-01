@@ -29,9 +29,11 @@ import {
   Wifi,
   Battery,
   Signal,
-  LayoutDashboard
+  LayoutDashboard,
+  Bot
 } from 'lucide-react';
 import { MissionControl } from './MissionControl';
+import { HermesWorkspace } from './HermesWorkspace';
 import { MemoriNode, AgentRecord } from '../types';
 import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -76,7 +78,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
   onSetGlobalSearchQuery,
   globalSearchResults
 }) => {
-  const [activeTab, setActiveTab] = useState<'memory' | 'agents' | 'import' | 'chat' | 'system' | 'mission'>('mission');
+  const [activeTab, setActiveTab] = useState<'memory' | 'agents' | 'import' | 'chat' | 'system' | 'mission' | 'hermes'>('mission');
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -287,6 +289,7 @@ export const MobileView: React.FC<MobileViewProps> = ({
                 if (mode === 'city' || mode === 'graph') setActiveTab('memory');
                 if (mode === 'skills') setActiveTab('agents');
                 if (mode === 'files') setActiveTab('system');
+                if (mode === 'hermes') setActiveTab('hermes');
               }} />
             </motion.div>
           )}
@@ -662,6 +665,18 @@ export const MobileView: React.FC<MobileViewProps> = ({
             </motion.div>
           )}
 
+          {activeTab === 'hermes' && (
+            <motion.div
+              key="hermes"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="h-full flex flex-col"
+            >
+              <HermesWorkspace hideHeader />
+            </motion.div>
+          )}
+
           {activeTab === 'chat' && (
             <motion.div
               key="chat"
@@ -760,6 +775,12 @@ export const MobileView: React.FC<MobileViewProps> = ({
           onClick={() => handleTabChange('agents')} 
           icon={<Cpu size={20} />} 
           label="Swarm"
+        />
+        <NavButton 
+          active={activeTab === 'hermes'} 
+          onClick={() => handleTabChange('hermes')} 
+          icon={<Bot size={20} />} 
+          label="Hermes"
         />
         <div className="relative -top-6">
           <div className="absolute inset-0 bg-neon-cyan/20 blur-xl rounded-full animate-pulse" />

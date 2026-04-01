@@ -7,6 +7,7 @@ import { MemoriGraph } from './components/MemoriGraph';
 import { MemoriCity } from './components/MemoriCity';
 import { ImportDock } from './components/ImportDock';
 import { KnowledgeCommons } from './components/KnowledgeCommons';
+import { HermesWorkspace } from './components/HermesWorkspace';
 import { MemoryService } from './services/memoryService';
 import { OrchestratorService } from './services/orchestratorService';
 import { useSettings } from './contexts/SettingsContext';
@@ -94,7 +95,7 @@ export default function App() {
   const [newContent, setNewContent] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [viewMode, setViewMode] = useState<'graph' | 'city' | 'skills' | 'research' | 'files' | 'commons' | 'mission-control'>('mission-control');
+  const [viewMode, setViewMode] = useState<'graph' | 'city' | 'skills' | 'research' | 'files' | 'commons' | 'mission-control' | 'hermes'>('mission-control');
   const [activeImport, setActiveImport] = useState<'text' | 'file' | 'url' | 'voice' | 'obsidian' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [obsidianHandle, setObsidianHandle] = useState<FileSystemDirectoryHandle | null>(null);
@@ -906,10 +907,20 @@ export default function App() {
               COMMONS
             </button>
             <button 
-              onClick={() => setIsHermesImportOpen(true)}
-              className="px-2.5 py-1 transition-all text-[9px] font-mono uppercase tracking-widest text-neon-pink hover:bg-neon-pink/10 border border-neon-pink/20 ml-2"
+              onClick={() => setViewMode('hermes')}
+              className={cn(
+                "px-2.5 py-1 transition-all text-[9px] font-mono uppercase tracking-widest border ml-2",
+                viewMode === 'hermes' ? "bg-neon-pink text-void font-bold border-neon-pink" : "text-neon-pink border-neon-pink/20 hover:bg-neon-pink/10"
+              )}
             >
-              HERMES
+              HERMES WORKSPACE
+            </button>
+            <button 
+              onClick={() => setIsHermesImportOpen(true)}
+              className="px-2.5 py-1 transition-all text-[9px] font-mono uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/5 ml-2"
+              title="Import via Hermes Protocol"
+            >
+              IMPORT
             </button>
           </div>
           <button 
@@ -1164,6 +1175,10 @@ export default function App() {
           ) : viewMode === 'commons' ? (
             <CodecPanel title="KNOWLEDGE_COMMONS_HUB" className="flex-1 !p-0 overflow-hidden battle-border min-h-0">
               <KnowledgeCommons />
+            </CodecPanel>
+          ) : viewMode === 'hermes' ? (
+            <CodecPanel title="HERMES_AGENT_WORKSPACE" className="flex-1 !p-0 overflow-hidden battle-border min-h-0">
+              <HermesWorkspace />
             </CodecPanel>
           ) : (
             <>

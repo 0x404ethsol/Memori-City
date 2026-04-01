@@ -52,7 +52,7 @@ export interface TaskDetail {
 export interface AgentRecord {
   id: string;
   agent_id: string;
-  agent_type: 'janitor' | 'linker' | 'researcher' | 'archivist' | 'notary' | 'builder';
+  agent_type: 'janitor' | 'linker' | 'researcher' | 'archivist' | 'notary' | 'builder' | 'hermes';
   status: 'sleeping' | 'running' | 'dead';
   last_heartbeat: string;
   current_task?: string;

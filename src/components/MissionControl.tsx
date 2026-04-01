@@ -79,6 +79,7 @@ export const MissionControl: React.FC<MissionControlProps> = ({ setViewMode }) =
     { id: 'skills', label: 'Skill Forge', icon: Zap, description: 'Agent tool configuration', color: 'text-neon-yellow', glow: 'shadow-neon-yellow/20' },
     { id: 'research', label: 'Deep Research', icon: Search, description: 'Autonomous knowledge synthesis', color: 'text-neon-pink', glow: 'shadow-neon-pink/20' },
     { id: 'commons', label: 'Knowledge Commons', icon: Layers, description: 'Shared intelligence pool', color: 'text-neon-blue', glow: 'shadow-neon-blue/20' },
+    { id: 'hermes', label: 'Hermes Workspace', icon: Bot, description: 'Native agent orchestration', color: 'text-neon-pink', glow: 'shadow-neon-pink/20' },
   ];
 
   const agentTypes = [
